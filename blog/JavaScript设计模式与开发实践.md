@@ -1,3 +1,57 @@
+<!-- TOC -->
+
+- [基础知识](#基础知识)
+    - [面向对象的 JavaScript](#面向对象的-javascript)
+        - [多态 polymorphism](#多态-polymorphism)
+        - [封装](#封装)
+        - [原型模式](#原型模式)
+    - [this、call 和 apply](#thiscall-和-apply)
+        - [丢失的 this](#丢失的-this)
+        - [call和apply用途](#call和apply用途)
+    - [闭包和高阶函数](#闭包和高阶函数)
+        - [变量作用域](#变量作用域)
+        - [变量的生存周期](#变量的生存周期)
+        - [闭包的应用](#闭包的应用)
+        - [高阶函数](#高阶函数)
+            - [高阶函数实现 AOP](#高阶函数实现-aop)
+            - [高阶函数的其他应用](#高阶函数的其他应用)
+- [设计模式](#设计模式)
+    - [单例模式](#单例模式)
+        - [使用命名空间](#使用命名空间)
+    - [策略模式](#策略模式)
+        - [利用策略模式实现动画效果](#利用策略模式实现动画效果)
+    - [代理模式](#代理模式)
+        - [虚拟代理合并 HTTP 请求](#虚拟代理合并-http-请求)
+        - [缓存代理](#缓存代理)
+    - [迭代器模式](#迭代器模式)
+    - [发布-订阅模式](#发布-订阅模式)
+        - [模块间通信](#模块间通信)
+    - [命令模式](#命令模式)
+        - [宏命令](#宏命令)
+    - [组合模式](#组合模式)
+        - [安全问题](#安全问题)
+        - [注意地方](#注意地方)
+        - [适用场景](#适用场景)
+    - [模板方法模式](#模板方法模式)
+        - [好莱坞原则](#好莱坞原则)
+    - [享元模式](#享元模式)
+        - [文件上传案例](#文件上传案例)
+        - [适用性](#适用性)
+        - [对象池](#对象池)
+    - [职责链模式](#职责链模式)
+    - [中介者模式](#中介者模式)
+    - [装饰者模式](#装饰者模式)
+    - [状态模式](#状态模式)
+    - [适配器模式](#适配器模式)
+- [设计原则和编程技巧](#设计原则和编程技巧)
+    - [单一职责原则](#单一职责原则)
+    - [最少知识原则](#最少知识原则)
+    - [开放-封闭原则](#开放-封闭原则)
+    - [接口和面向接口编程](#接口和面向接口编程)
+    - [代码重构](#代码重构)
+
+<!-- /TOC -->
+
 # 基础知识
 ## 面向对象的 JavaScript
 > JavaScript 没有提供传统的面向对象的类式继承和对抽象类、接口的支持，而是通过原型委托的方式实现对象间的继承。
@@ -1224,9 +1278,349 @@ var RefreshMenuBarCommand = function(receiver) {
 var refreshMenuBarCommand = RefreshMenuBarCommand(MenuBar);
 setCommand(button1, refreshMenuBarCommand);
 ```
+### 宏命令
+宏命令是一组命令的集合，通过执行宏命令的方式，可以一次执行一批命令。
+```javascript
+var closeDoorCommand = {
+    execute: function(){
+        console.log( '关门' );
+    }
+};
+var openPcCommand = {
+    execute: function(){
+        console.log( '开电脑' );
+    }
+};
+
+var openQQCommand = {
+    execute: function(){
+        console.log( '登录QQ' );
+    }
+};
+
+var MacroCommand = function(){
+    return {
+        commandsList: [],
+        add: function( command ){
+            this.commandsList.push( command );
+        },
+        execute: function(){
+            for ( var i = 0, command; command = this.commandsList[ i++ ]; ){
+                command.execute();
+            }
+        }
+    }
+};
+var macroCommand = MacroCommand();
+macroCommand.add( closeDoorCommand );
+macroCommand.add( openPcCommand );
+macroCommand.add( openQQCommand );
+macroCommand.execute();
+```
+傻瓜命令: 一般来说，命令模式都会在 command 对象中保存一个接收者来负责真正执行客户的请求，只负责把客户的请求转交给接收者来执行，这种模式是请求发起者和请求接收者尽可能地得到了解耦。
+
+聪明命令: 命令对象可以直接实现请求，这样一来就不再需要接受者的存在，这种命令对象也叫智能命令。没有接受者的智能命令与策略模式相近，只能通过意图进行分辨。策略模式所有策略对象是一致的，是达到某个目标不同手段。而智能命令模式更广，对象解决目标具有发散性。命令模式还可以完成撤销、排队等功能。
+
 ## 组合模式
+> 组合模式: 用小的子对象来构建更大的对象，而这些小的子对象本身也许是由更小的"孙对象"构成的。
+
+在宏命令中， macroCommand 被称为组合对象，closeDoorCommand、openPcCommand都是叶对象。
+
+组合模式将对象组成树形结构，以表示"部分-整体"的层次结构。除了用来**表示树形结构**之外，组合模式的另一个好处是通过**对象的多态性**表现，使得用户对单个对象和组合对象的使用具有一致性。
+
+在组合模式中，客户将统一地使用组合结构中的所有对象，无需关心它究竟是组合对象还是单个对象。
+
+在组合模式中，请求在树中传递过程总是遵循一种逻辑: 请求从树最顶端对象向下传递，遇到叶对象则进行处理，遇到组合对象，则会遍历下属的子节点，继续传递请求。
+
+```javascript
+var MacroCommand = function() {
+    return {
+        commandsList: [],
+        add: function(command) {
+            this.commandsList.push(command);
+        },
+        execute: function() {
+            for (var i = 0, command; command = this.commandsList[i++];) {
+                command.execute();
+            }
+        }
+    }
+};
+var openAcCommand = {
+    execute: function() {
+        console.log('打开空调');
+    }
+};
+/**********家里的电视和音响是连接在一起的，所以可以用一个宏命令来组合打开电视和打开音响的命令*********/
+var openTvCommand = {
+    execute: function() {
+        console.log('打开电视');
+    }
+};
+var openSoundCommand = {
+    execute: function() {
+        console.log('打开音响');
+    }
+};
+var macroCommand1 = MacroCommand();
+macroCommand1.add(openTvCommand);
+macroCommand1.add(openSoundCommand);
+/*********现在把所有的命令组合成一个“超级命令”**********/
+var macroCommand = MacroCommand();
+macroCommand.add(openAcCommand);
+macroCommand.add(macroCommand1);
+/*********最后给遥控器绑定“超级命令”**********/
+var setCommand = (function(command) {
+    document.getElementById('button').onclick = function() {
+        command.execute();
+    }
+})(macroCommand);
+```
+组合模式的最大优点在于可以一致地对待组合对象和基本对象。客户不需要知道当前处理的是宏命令还是普通命令，只要是一个命令，并且有 execute 方法，就可以加入到树中。
+
+### 安全问题
+组合对象可以拥有子节点。叶对象下面没有子节点，这时如果试图往叶对象中添加子节点是没有效果的。解决方案是添加 throw 处理:
+```javascript
+var leafCommand = {
+    // 子节点
+    execute: function() {
+        console.log('子节点执行操作');
+    },
+    add: function() {
+        throw new Error('叶对象不能添加字节点');
+    }
+}
+```
+> 组合模式可用于文件扫描,文件结构是树形的。
+### 注意地方
+1. 组合模式不是父子关系,是一种 HAS-A(聚合)关系
+2. 对叶对象操作的一致性: 不适宜用于处理个别情况
+3. 双向映射关系: 如果两个父节点都包含一个相同的子节点，这种复合情况需要父节点和子节点建立双向映射关系,但会造成复杂的引用关系，可以引入中介者模式管理
+4. 用职责链模式提高组合模式性能: 在组合模式中，如果树结构比较复杂，节点数量多，在遍历树过程中，性能表现不理想，这时可以使用职责链模式，避免遍历整颗树。
+
+在组合模式中，父对象和子对象之间实际上形成了天然的职责链。让请求顺着链条从父对象往子对象传递，或反向传递，直到遇到可以处理该请求对象为止。这是职责链的经典场景之一。
+
+可以在子节点添加 parent 属性记录父节点的索引，在执行 add 操作时候更新子节点的 parent 属性。
+### 适用场景
+1. 表示对象的部分-整体层次结构
+2. 客户希望统一对待树中所有对象
+
 ## 模板方法模式
+> 模板方法是一种指需要使用继承就可以实现的简单模式。由两部分构成，第一部分是抽象父类，第二部分是具体的实现子类。
+
+钩子方法(hook) 用于隔离变化的一种手段，在父类中容易变化的地方放置钩子，钩子可以有一种默认的实现，由子类决定是否使用钩子。
+
+非使用 prototype 原型继承的例子:
+```javascript
+// 模板方法
+var Beverage = function( param ){
+    var boilWater = function(){
+        console.log( '把水煮沸' );
+    };
+    var brew = param.brew || function(){
+        throw new Error( '必须传递brew 方法' );
+    };
+    var pourInCup = param.pourInCup || function(){
+        throw new Error( '必须传递pourInCup 方法' );
+    };
+    var addCondiments = param.addCondiments || function(){
+        throw new Error( '必须传递addCondiments 方法' );
+    };
+    var customerWantsCondiments = param.customerWantsCondiments || function() {
+        return true; // 默认需要调料
+    };
+    var F = function(){};
+    F.prototype.init = function(){
+        boilWater();
+        brew();
+        pourInCup();
+        if (this.customerWantsCondiments()) { 
+            // 如果挂钩返回true，则需要调料
+            this.addCondiments();
+        }
+    };
+    return F;
+};
+var Coffee = Beverage({
+    brew: function(){
+        console.log( '用沸水冲泡咖啡' );
+    },
+    pourInCup: function(){
+        console.log( '把咖啡倒进杯子' );
+    },
+    addCondiments: function(){
+        console.log( '加糖和牛奶' );
+    }
+});
+
+var Tea = Beverage({
+    brew: function(){
+        console.log( '用沸水浸泡茶叶' );
+    },
+    pourInCup: function(){
+        console.log( '把茶倒进杯子' );
+    },
+    addCondiments: function(){
+        console.log( '加柠檬' );
+    }
+});
+var coffee = new Coffee();
+coffee.init();
+var tea = new Tea();
+tea.init();
+```
+### 好莱坞原则
+好莱坞原则即我们允许组件将自己挂钩到高层组件中，而高层组件决定什么时候、以何种方式去使用这些底层组件。模板方法模式是好莱坞原则的一个典型使用场景。除此之外，好莱坞原则还常常应用于发布-订阅模式和回调函数。
 ## 享元模式
+> 享元模式是一种用于性能优化的模式，核心是运用共享技术来有效支持大量细粒度的对象。适用于大量创建相似对象的场景，减少内存占用。
+
+享元模式要求将对象的属性划分为内部状态和外部状态(状态通常指属性),目标是尽量减少共享对象数量，划分状态经验:
+1. 内部状态存储于对象内部
+2. 内部状态可以被一些对象共享
+3. 内部状态独立于具体的场景，通常不会改变
+4. 外部状态取决于具体的场景，并根据场景而变化，外部状态不能被共享
+   
+### 文件上传案例
+```javascript
+// 剥离外部状态
+var Upload = function(uploadType) {
+    this.uploadType = uploadType;// 上传方式属于内部状态
+};
+// 取消文件的上传
+Upload.prototype.delFile = function(id) {
+    // 把当前id对应的对象的外部状态组装到共享对象中
+    // 给共享对象设置正确的fileSize
+    uploadManager.setExternalState(id, this); 
+    if (this.fileSize < 3000) {
+        return this.dom.parentNode.removeChild(this.dom);
+    }
+
+    if (window.confirm('确定要删除该文件吗? ' + this.fileName)) {
+        return this.dom.parentNode.removeChild(this.dom);
+    }
+}
+// 工厂进行对象实例化,保存不同的内部状态
+var UploadFactory = (function() {
+    var createdFlyWeightObjs = {};
+    return {
+        create: function(uploadType) {
+            if (createdFlyWeightObjs[uploadType]) {
+                return createdFlyWeightObjs[uploadType];
+            }
+            return createdFlyWeightObjs[uploadType] = new Upload(uploadType);
+        }
+    }
+})();
+// 管理器封装外部状态
+var uploadManager = (function() {
+    var uploadDatabase = {}; // 保存所有对象外部状态
+    return {
+        add: function(id, uploadType, fileName, fileSize) {
+            var flyWeightObj = UploadFactory.create(uploadType);
+            var dom = document.createElement('div');
+            dom.innerHTML =
+                '<span>文件名称:' + fileName + ', 文件大小: ' + fileSize + '</span>' +
+                '<button class="delFile">删除</button>';
+            dom.querySelector('.delFile').onclick = function() {
+                flyWeightObj.delFile(id);
+            }
+
+            document.body.appendChild(dom);
+            uploadDatabase[id] = {
+                fileName: fileName,
+                fileSize: fileSize,
+                dom: dom
+            };
+            return flyWeightObj;
+        },
+        setExternalState: function(id, flyWeightObj) {
+            var uploadData = uploadDatabase[id];
+            for (var i in uploadData) {
+                flyWeightObj[i] = uploadData[i];
+            }
+        }
+    }
+})();
+
+var id = 0;
+window.startUpload = function(uploadType, files) {
+    for (var i = 0, file; file = files[i++];) {
+        var uploadObj = uploadManager.add(++id, uploadType, file.fileName, file.fileSize);
+    }
+};
+
+// 创建上传对象
+// 只有两个对象
+startUpload('plugin', [{
+    fileName: '1.txt',
+    fileSize: 1000
+}, {
+    fileName: '2.html',
+    fileSize: 3000
+}, {
+    fileName: '3.txt',
+    fileSize: 5000
+}]);
+startUpload('flash', [{
+    fileName: '4.txt',
+    fileSize: 1000
+}, {
+    fileName: '5.html',
+    fileSize: 3000
+}, {
+    fileName: '6.txt',
+
+    fileSize: 5000
+}]);
+```
+### 适用性
+使用享元模式后需要分别多维护一个 factory 对象和一个 manager 对象，也带来了一些复杂性的问题。享元模式带来的好处很大程度上取决于如何使用及何时使用。使用场景
+- 一个程序使用大量相似对象
+- 由于使用大量对象，造成很大内存开销
+- 对象多数状态都可以变为外部状态
+- 剥离出对象外部状态之后，可以用相对较少的共享对象取代大量对象。
+
+### 对象池
+对象池维护一个装载空闲对象的池子，如果需要对象，不是直接new，而是转从对象池中获取。如果对象池没有空闲对象，再创建一个新对象。常用有 HTTP 连接池和数据库连接池
+
+```javascript
+// 对象池跟享元模式的思想相似
+// 但没有分离内部状态和外部状态的过程
+var objectPoolFactory = function(createObjFn) {
+    var objectPool = [];
+    return {
+        create: function() {
+            // 判断对象池是否为空
+            var obj = objectPool.length === 0 ?
+                createObjFn.apply(this, arguments) : objectPool.shift();
+            return obj;
+        },
+        recover: function(obj) {
+            objectPool.push(obj);// 对象池回收dom
+        }
+    }
+};
+
+var iframeFactory = objectPoolFactory(function() {
+    var iframe = document.createElement('iframe');
+    document.body.appendChild(iframe);
+    iframe.onload = function() {
+        iframe.onload = null; // 防止iframe 重复加载的bug
+        iframeFactory.recover(iframe); // iframe 加载完成之后回收节点
+    }
+    return iframe;
+});
+
+var iframe1 = iframeFactory.create();
+iframe1.src = 'http://baidu.com';
+var iframe2 = iframeFactory.create();
+iframe2.src = 'http://QQ.com';
+setTimeout(function() {
+    var iframe3 = iframeFactory.create();
+    iframe3.src = 'http://163.com';
+}, 3000);
+```
+对象池是另外一种性能优化方案，它跟享元模式有些相似之处，但没有分离内部状态和外部状态这个过程。
 ## 职责链模式
 ## 中介者模式
 ## 装饰者模式
