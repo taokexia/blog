@@ -592,6 +592,163 @@ var getSingle = function(fn) {
 ## 策略模式
 > 定义是: 定义一系类的算法，把它们一个个封装起来，并且使它们可以互相替换。
 
+一个基于策略模式的程序至少由两部分组成。第一个部分是一组策略类，策略类封装了具体的算法，并负责具体的计算过程。第二个部分是环境类 Context，Context 接收客户的请求，随后请求委托给某一个策略类。 Context 中维持对某个策略对象的引用。
+```javascript
+var strategies = {
+    'S': function(salary) {
+        return salary * 4;
+    },
+    'A': function(salary) {
+        return salary * 3;
+    },
+    'B': function(salary) {
+        return salary * 2;
+    }
+};
+var calculateBonus = function(level, salary) {
+    return strategies[level](salary);
+}
+// 案例
+console.log(calculateBonus('S', 20000));
+```
+### 利用策略模式实现动画效果
+```html
+<body>
+    <div style="position:absolute;background:blue" id="div">我是div</div>
+
+</body>
+<script>
+    // 定义动画的策略
+    var tween = {
+        linear: function(t, b, c, d) {
+            return c * t / d + b;
+        },
+        easeIn: function(t, b, c, d) {
+            return c * (t /= d) * t + b;
+        },
+        strongEaseIn: function(t, b, c, d) {
+            return c * (t /= d) * t * t * t * t + b;
+        },
+        strongEaseOut: function(t, b, c, d) {
+            return c * ((t = t / d - 1) * t * t * t * t + 1) + b;
+        },
+        sineaseIn: function(t, b, c, d) {
+            return c * (t /= d) * t * t + b;
+        },
+        sineaseOut: function(t, b, c, d) {
+            return c * ((t = t / d - 1) * t * t + 1) + b;
+        }
+    };
+    // 定义动画类
+    var Animate = function(dom) {
+        this.dom = dom; // 进行运动的dom 节点
+        this.startTime = 0; // 动画开始时间
+        this.startPos = 0; // 动画开始时，dom 节点的位置，即dom 的初始位置
+        this.endPos = 0; // 动画结束时，dom 节点的位置，即dom 的目标位置
+        this.propertyName = null; // dom 节点需要被改变的css 属性名
+        this.easing = null; // 缓动算法
+        this.duration = null; // 动画持续时间
+    };
+
+
+    Animate.prototype.start = function(propertyName, endPos, duration, easing) {
+        this.startTime = +new Date; // 动画启动时间
+        this.startPos = this.dom.getBoundingClientRect()[propertyName]; // dom 节点初始位置
+        this.propertyName = propertyName; // dom 节点需要被改变的CSS 属性名
+        this.endPos = endPos; // dom 节点目标位置
+        this.duration = duration; // 动画持续事件
+        this.easing = tween[easing]; // 缓动算法
+        var self = this;
+        var timeId = setInterval(function() { // 启动定时器，开始执行动画
+            if (self.step() === false) { // 如果动画已结束，则清除定时器
+                clearInterval(timeId);
+            }
+        }, 19);
+    };
+    // 小球运动每一帧要做的事情
+    Animate.prototype.step = function() {
+        var t = +new Date; // 取得当前时间
+        if (t >= this.startTime + this.duration) { // 判断动画时间是否结束
+            this.update(this.endPos); // 更新小球的CSS 属性值
+            return false;
+        }
+        var pos = this.easing(t - this.startTime, this.startPos, this.endPos - this.startPos, this.duration);
+        // pos 为小球当前位置
+        this.update(pos); // 更新小球的CSS 属性值
+    };
+    // 更新运动属性
+    Animate.prototype.update = function(pos) {
+        this.dom.style[this.propertyName] = pos + 'px';
+    };
+
+    var div = document.getElementById('div');
+    var animate = new Animate(div);
+    animate.start('left', 500, 1000, 'strongEaseOut');
+</script>
+```
+
+在实际开发中，我们常把算法含义扩散开来，使策略模式也可以封装一系列业务规则。例如利用策略模式来进行表单验证。
+
+```javascript
+/*************** 策略对象 *******************/
+var strategies = {
+    isNonEmpty: function(value, errorMsg) { // 不为空
+        if (value === '') {
+            return errorMsg;
+        }
+    },
+    minLength: function(value, length, errorMsg) { // 限制最小长度
+        if (value.length < length) {
+            return errorMsg;
+        }
+    },
+    isMobile: function(value, errorMsg) { // 手机号码格式
+        if (!/(^1[3|5|8][0-9]{9}$)/.test(value)) {
+            return errorMsg;
+        }
+    }
+};
+/****** 定义类来保存要检验的内容 **********/
+var Validator = function() {
+    this.cache = []; // 保存校验规则
+};
+Validator.prototype.add = function(dom, rule, errorMsg) {
+    var ary = rule.split(':'); // 把strategy 和参数分开
+    this.cache.push(function() { // 把校验的步骤用空函数包装起来，并且放入cache
+        var strategy = ary.shift(); // 用户挑选的strategy
+        ary.unshift(dom.value); // 把input 的value 添加进参数列表
+        ary.push(errorMsg); // 把errorMsg 添加进参数列表
+        return strategies[strategy].apply(dom, ary);
+    });
+};
+Validator.prototype.start = function() {
+    for (var i = 0, validatorFunc; validatorFunc = this.cache[i++];) {
+        var msg = validatorFunc(); // 开始校验，并取得校验后的返回信息
+        if (msg) { // 如果有确切的返回值，说明校验没有通过
+            return msg;
+        }
+    }
+};
+/********** 客户调用代码 *******************/
+var validataFunc = function() {
+    var validator = new Validator(); // 创建一个validator 对象
+    /***************添加一些校验规则****************/
+    validator.add(registerForm.userName, 'isNonEmpty', '用户名不能为空');
+    validator.add(registerForm.password, 'minLength:6', '密码长度不能少于6 位');
+    validator.add(registerForm.phoneNumber, 'isMobile', '手机号码格式不正确');
+    var errorMsg = validator.start(); // 获得校验结果
+    return errorMsg; // 返回校验结果
+}
+var registerForm = document.getElementById('registerForm');
+registerForm.onsubmit = function() {
+    var errorMsg = validataFunc(); // 如果errorMsg 有确切的返回值，说明未通过校验
+    if (errorMsg) {
+        alert(errorMsg);
+        return false; // 阻止表单提交
+    }
+};
+```
+
 策略模式优点:
 1. 利用组合、委托、多态等技术和思想，可以有效地避免多重条件选择语句
 2. 提供了对开封-封闭原则的完美支持，将算法封装在独立的 strategy中，使得它们易于切换，易于理解，易于扩展。
@@ -599,9 +756,474 @@ var getSingle = function(fn) {
 4. 利用组合和委托来让 Context 拥有执行算法的能力，也是继承的一种替代方案
 
 ## 代理模式
+> 代理模式是为一个对象提供一个代用品或占位符，以便控制对它的访问。
+
+两种代理模式: 通过代理拒绝某些请求的方式为**保护代理**，用于控制不同权限对象对目标对象的访问; 把一些开销很大的对象，延迟到真正需要它的时候才创建为**虚拟代理**。
+
+虚拟代理案例:
+```javascript
+var myImage = (function() {
+    var imgNode = document.createElement('img');
+    document.body.appendChild(imgNode);
+    return {
+        setSrc: function(src) {
+            imgNode.src = src;
+        }
+    }
+})();
+// 代理，先显示本地图片，加载完成后显示网络图片
+var proxyImage = (function() {
+    var img = new Image;
+    img.onload = function() {
+        myImage.setSrc(this.src);
+    }
+    return {
+        setSrc: function(src) {
+            myImage.setSrc('loading.jpg');
+            img.src = src;
+        }
+    }
+})();
+proxyImage.setSrc('https://p.qpic.cn/music_cover/Fe6emiag6IuVbMib3oN6yctRX8ZBICoa4liaYZkwZoSCaJdw7tOW5bCiaA/300?n=1');
+```
+> 单一职责原则: 就一个类而言，应该仅有一个引起它变化的原因。职责被定义为"引起变化的原因"。
+
+如果代理对象和本体对象都为一个函数，函数必然都能被执行，则可以认为他们也具有一致的“接口”。
+```javascript
+var myImage = (function() {
+    var imgNode = document.createElement('img');
+    document.body.appendChild(imgNode);
+    // 返回函数
+    return function(src) {
+        imgNode.src = src;
+    }
+})();
+```
+
+### 虚拟代理合并 HTTP 请求
+```javascript
+// 发送文件的时间，用于绑定事件，并且在点击的同时往另一台服务器同步文件：
+var synchronousFile = function(id) {
+    console.log('开始同步文件，id 为: ' + id);
+};
+// 延迟2秒，把所有请求一起发送，减轻服务器负担
+var proxySynchronousFile = (function() {
+    var cache = [], // 保存一段时间内需要同步的ID
+        timer; // 定时器
+    return function(id) {
+        cache.push(id);
+        if (timer) { // 保证不会覆盖已经启动的定时器
+            return;
+        }
+        timer = setTimeout(function() {
+            synchronousFile(cache.join(',')); // 2 秒后向本体发送需要同步的ID 集合
+            clearTimeout(timer); // 清空定时器
+            timer = null;
+            cache.length = 0; // 清空ID 集合
+        }, 2000);
+    }
+})();
+```
+### 缓存代理
+缓存代理可以为一些开销大的运算结果提供暂时的存储，在下次运算时，如果传递进来的参数跟之前的一致，可以直接返回前面存储的运算结果。
+```javascript
+/**************** 计算乘积 *****************/
+var mult = function(){
+    var a = 1;
+    for ( var i = 0, l = arguments.length; i < l; i++ ){
+        a = a * arguments[i];
+    }
+    return a;
+};
+/**************** 计算加和 *****************/
+var plus = function(){
+    var a = 0;
+    for ( var i = 0, l = arguments.length; i < l; i++ ){
+        a = a + arguments[i];
+    }
+    return a;
+};
+/********* 创建缓存代理的工厂 *************/
+var createProxyFactory = function( fn ){
+    // 建立缓存对象
+    var cache = {};
+    return function(){
+        var args = Array.prototype.join.call( arguments, ',' );
+        if ( args in cache ){
+            return cache[ args ];
+        }
+        return cache[ args ] = fn.apply( this, arguments );
+    }
+};
+// 案例
+var proxyMult = createProxyFactory( mult ),
+proxyPlus = createProxyFactory( plus );
+console.log( proxyMult( 1, 2, 3, 4 ) ); // 输出：24
+console.log( proxyPlus( 1, 2, 3, 4 ) ); // 输出：10
+```
+
+其他代理模式: 防火墙代理、远程代理、保护代理、智能引用代理等
+
 ## 迭代器模式
+> 迭代器模式指提供一种方法顺序访问一个聚合对象中的各个元素，而又不需要暴露该对象的内部表示。如 JavaScript 中的 `Array.prototype.forEach`
+
+内部迭代器: 接受2个参数，第一个为被循环的数组，第二个为循环中的每一步后将触发的回调函数。内部迭代器调用方便，外界不用关心内部实现，跟迭代器交互仅第一次初始调用，缺陷是内部迭代规则无法进行修改。
+```javascript
+var each = function(ary, callback) {
+    for(var i = 0, l = ary.length; i < l; i++) {
+        callback.call(ary[i], i, ary[i]); // 把下标和元素作为参数传给callback函数
+    }
+}
+```
+外部迭代器: 必须显示请求迭代下一个元素。增加了调用复杂度，但也相对增加了灵活性。
+```javascript
+// 适用面更广，能满足更多变的需求
+var Iterator = function( obj ){
+    var current = 0;
+    var next = function(){
+        current += 1;
+    };
+    var isDone = function(){
+        return current >= obj.length;
+    };
+    var getCurrItem = function(){
+        return obj[ current ];
+    };
+    return {
+        next: next,
+        isDone: isDone,
+        getCurrItem: getCurrItem
+    }
+};
+// 比较函数
+var compare = function( iterator1, iterator2 ){
+    while( !iterator1.isDone() && !iterator2.isDone() ){
+        if ( iterator1.getCurrItem() !== iterator2.getCurrItem() ){
+            throw new Error ( 'iterator1 和iterator2 不相等' );
+        }
+        iterator1.next();
+        iterator2.next();
+    }
+    console.log( 'iterator1 和iterator2 相等' );
+}
+var iterator1 = Iterator( [ 1, 2, 3 ] );
+var iterator2 = Iterator( [ 1, 2, 3 ] );
+compare( iterator1, iterator2 ); // 输出：iterator1 和iterator2 相等
+```
+迭代器模式不仅可以迭代数组，还可以迭代一些类数组对象。只要被迭代的聚合对象具有 length 属性且可以用下标访问，就可以被迭代。
+```javascript
+// 倒序迭代器
+var reverseEach = function(ary, callback) {
+    for(var l = ary.length-1; l >= 0; l--) {
+        callback(l, ary[l]);
+    }
+}
+// 终止迭代器
+var each = function( ary, callback ){
+    for ( var i = 0, l = ary.length; i < l; i++ ){
+        if ( callback( i, ary[ i ] ) === false ){ // callback 的执行结果返回false，提前终止迭代
+            break;
+        }
+    }
+};
+```
+
 ## 发布-订阅模式
+> 发布订阅模式又叫观察者模式，它定义对象间的一种一对多的依赖关系，当一个对象的状态发生改变时，所有依赖于它的对象都将得到通知。
+
+发布订阅模式可以广泛应用于异步编程中，这是一种替代传递回调函数的方案。发布订阅模式可以取代对象之间硬编码的通知机制，一个对象不用再显式地调用另外一个对象的某个接口。
+
+DOM 节点上绑定事件函数就是应用了发布订阅模式。
+
+通用发布-订阅模式代码:
+```javascript
+var event = {
+    clientList: [], // 二维数据，用于保存订阅事件
+    listen: function( key, fn ){ // 订阅事件
+        if ( !this.clientList[ key ] ){
+            this.clientList[ key ] = [];
+        };
+        this.clientList[ key ].push( fn ); // 订阅的消息添加进缓存列表
+    },
+    trigger: function(){ // 发布事件
+        var key = Array.prototype.shift.call( arguments ), // 获得事件 key
+        fns = this.clientList[ key ];
+        if ( !fns || fns.length === 0 ){ // 如果没有绑定对应的消息
+            return false;
+        }
+        for( var i = 0, fn; fn = fns[ i++ ]; ){
+            fn.apply( this, arguments ); // arguments 是trigger 时带上的参数
+        }
+    },
+    remove: function( key, fn ){ // 移除订阅
+		var fns = this.clientList[ key ];
+		if ( !fns ){ // 如果key 对应的消息没有被人订阅，则直接返回
+			return false;
+		}
+		if ( !fn ){ // 如果没有传入具体的回调函数，表示需要取消key 对应消息的所有订阅
+			fns && ( fns.length = 0 );
+		}else{
+			for ( var l = fns.length - 1; l >=0; l-- ){ // 反向遍历订阅的回调函数列表
+				var _fn = fns[ l ];
+				if ( _fn === fn ){
+					fns.splice( l, 1 ); // 删除订阅者的回调函数
+				}
+			}
+		}
+	}
+};
+// 可以给所有的对象安装发布-订阅功能
+var installEvent = function( obj ){
+    for ( var i in event ){
+        obj[ i ] = event[ i ];
+    }
+};
+```
+### 模块间通信
+利用发布订阅模式，可以在两个封装良好的模块中通信，这两个模块完全不知道对方的存在。
+```javascript
+// 通用发布-订阅模式
+var Event = (function() {
+    var clientList = {},
+        listen,
+        trigger,
+        remove;
+    listen = function(key, fn) {
+        if (!clientList[key]) {
+            clientList[key] = [];
+        }
+        clientList[key].push(fn);
+    };
+    trigger = function() {
+        var key = Array.prototype.shift.call(arguments),
+            fns = clientList[key];
+        if (!fns || fns.length === 0) {
+            return false;
+        }
+        for (var i = 0, fn; fn = fns[i++];) {
+            fn.apply(this, arguments);
+        }
+    };
+    remove = function(key, fn) {
+        var fns = clientList[key];
+        if (!fns) {
+            return false;
+        }
+        if (!fn) {
+            fns && (fns.length = 0);
+        } else {
+            for (var l = fns.length - 1; l >= 0; l--) {
+                var _fn = fns[l];
+                if (_fn === fn) {
+                    fns.splice(l, 1);
+                }
+            }
+        }
+    };
+    return {
+        listen: listen,
+        trigger: trigger,
+        remove: remove
+    }
+})();
+// 模块a
+var a = (function() {
+    var count = 0;
+    var button = document.getElementById('count');
+    button.onclick = function() {
+        Event.trigger('add', count++);
+    }
+})();
+// 模块b
+var b = (function() {
+    var div = document.getElementById('show');
+    Event.listen('add', function(count) {
+        div.innerHTML = count;
+    });
+})();
+```
+在某些情况下，还可以先把发布的消息保存下来，等到有对象订阅它的时候，再重新把消息发送给订阅者。例如: QQ中离线消息。
+
+使用命名空间解决命名冲突，同时添加保存消息的功能
+```javascript
+// 更新Event，使得可以在订阅之前存储发布的内容
+var Event = (function(){
+    var global = this,
+    Event,
+    _default = 'default';
+    Event = function(){
+        var _listen,
+        _trigger,
+        _remove,
+        _slice = Array.prototype.slice, // 绑定原生Array函数
+        _shift = Array.prototype.shift, // 绑定原生Array函数
+        _unshift = Array.prototype.unshift, // 绑定原生Array函数
+        namespaceCache = {},
+        _create,
+        find,
+        each = function( ary, fn ){  // 迭代器
+            var ret;
+            for ( var i = 0, l = ary.length; i < l; i++ ){
+                var n = ary[i];
+                ret = fn.call( n, i, n);
+            }
+            return ret;
+        };
+        _listen = function( key, fn, cache ){   // 添加监听
+            if ( !cache[ key ] ){
+                cache[ key ] = [];
+            }
+            cache[key].push( fn );
+        };
+        _remove = function( key, cache ,fn){ // 移除监听
+            if ( cache[ key ] ){
+                if( fn ){
+                    for( var i = cache[ key ].length; i >= 0; i-- ){
+                        if( cache[ key ] === fn ){
+                            cache[ key ].splice( i, 1 );
+                        }
+                    }
+                }else{
+                    cache[ key ] = [];
+                }
+            }
+        };
+        _trigger = function(){ // 触发事件
+            var cache = _shift.call(arguments),
+            key = _shift.call(arguments),
+            args = arguments,
+            _self = this,
+            ret,
+            stack = cache[ key ];
+            if ( !stack || !stack.length ){
+                return;
+            }
+            return each( stack, function(){
+                return this.apply( _self, args );
+            });
+        };
+        _create = function( namespace ){ // 创建命名空间
+            var namespace = namespace || _default;
+            var cache = {},
+            offlineStack = [], // 离线事件
+            ret = {
+                listen: function( key, fn, last ){
+                    _listen( key, fn, cache );
+                    if ( offlineStack === null ){
+                        return;
+                    }
+                    if ( last === 'last' ){
+                    }else{
+                        each( offlineStack, function(){
+                            this();
+                        });
+                    }
+                    offlineStack = null;
+                },
+                one: function( key, fn, last ){
+                    _remove( key, cache );
+                    this.listen( key, fn ,last );
+                },
+                remove: function( key, fn ){
+                    _remove( key, cache ,fn);
+                },
+                trigger: function(){
+                    var fn,
+                    args,
+                    _self = this;
+                    _unshift.call( arguments, cache );
+                    args = arguments;
+                    fn = function(){
+                        return _trigger.apply( _self, args );
+                    };
+                    if ( offlineStack ){
+                        return offlineStack.push( fn );
+                    }
+                    return fn();
+                }
+            };
+            return namespace ?
+            ( namespaceCache[ namespace ] ? namespaceCache[ namespace ] :
+                namespaceCache[ namespace ] = ret )
+            : ret;
+        };
+        return {
+            create: _create,
+            one: function( key,fn, last ){
+                var event = this.create( );
+                event.one( key,fn,last );
+            },
+            remove: function( key,fn ){
+                var event = this.create( );
+                event.remove( key,fn );
+            },
+            listen: function( key, fn, last ){
+                var event = this.create( );
+                event.listen( key, fn, last );
+            },
+            trigger: function(){
+                var event = this.create( );
+                event.trigger.apply( this, arguments );
+            }
+        };
+    }();
+    return Event;
+})();
+
+/************* 先发布后订阅 ***************/ 
+Event.trigger('click', 1);
+Event.listen('click', function(a) {
+    console.log(a);     
+});
+
+
+/********** 使用命名空间 ******************/ 
+Event.create('namespace1').listen('click', function(a) {
+    console.log(a);
+})
+
+Event.create('namespace1').trigger('click', 1);
+
+Event.create('namespace2').listen('click', function(a) {
+    console.log(a);
+})
+Event.create('namespace2').trigger('click', 2);
+```
+JavaScript 无需选择使用推模型还是拉模型。推模型指在事件发生时，发布者一次性把所有更改的状态和数据都推送给订阅者。拉模型是发布者仅仅通知订阅者事件已经发生了，此外发布者要提供一些公开的接口供订阅者来主动拉取数据。
+
+发布-订阅模式优点是时间上解耦和对象间解耦。应用非常广泛。缺点是创建订阅者本身要消耗一定时间和内存，弱化对象之间的联系。
+
 ## 命令模式
+> 命令模式是最简单和优雅的模式之一，命令模式中的命令指的是一个执行某些特定事情的指令。
+
+最常用的场景是: 有时候需要向某些对象发送请求，但是并不知道请求的接收者是谁，也不知道被请求的操作是什么。此时需要一种松耦合的方式设计程序，使得请求的发送者和接收者能消除彼此的耦合关系。
+
+命令模式的由来，其实是回调(callback)函数的一个面向对象的替代品。
+
+```javascript
+var button1 = document.getElementById('button1');
+// 设置命令,接受按钮和绑定的函数
+var setCommand = function(button, command) {
+    button.onclick = function() {
+        command.execute();
+    }
+};
+var MenuBar = {
+    refresh: function() {
+        alert('刷新菜单界面');
+    }
+};
+// 设置命令，对外提供 execute 执行函数
+var RefreshMenuBarCommand = function(receiver) {
+    return {
+        execute: function() {
+            receiver.refresh();
+        }
+    }
+};
+var refreshMenuBarCommand = RefreshMenuBarCommand(MenuBar);
+setCommand(button1, refreshMenuBarCommand);
+```
 ## 组合模式
 ## 模板方法模式
 ## 享元模式
