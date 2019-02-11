@@ -45,12 +45,19 @@
         - [用 AOP 装饰函数](#用-aop-装饰函数)
         - [装饰者模式和代理模式](#装饰者模式和代理模式)
     - [状态模式](#状态模式)
+        - [定义抽象类](#定义抽象类)
+        - [和策略模式关系](#和策略模式关系)
     - [适配器模式](#适配器模式)
 - [设计原则和编程技巧](#设计原则和编程技巧)
     - [单一职责原则](#单一职责原则)
+        - [何时分离职责](#何时分离职责)
+        - [SPR 原则优缺点:](#spr-原则优缺点)
     - [最少知识原则](#最少知识原则)
+        - [封装在最少知识中体现](#封装在最少知识中体现)
     - [开放-封闭原则](#开放-封闭原则)
+        - [设计模式中的开发-封闭原则](#设计模式中的开发-封闭原则)
     - [接口和面向接口编程](#接口和面向接口编程)
+        - [用鸭子类型进行接口检查](#用鸭子类型进行接口检查)
     - [代码重构](#代码重构)
 
 <!-- /TOC -->
@@ -1902,11 +1909,439 @@ submitBtn.onclick = function() {
 
 最重要的区别在于它们的意图和设计目的。代理模式目的是当直接访问本体不方便或者不符合需要时，为这个本体提供一个替代者，通常只有一层代理-本体的引用，强调了代理和本体的关系。装饰者模式作用是为对象动态加入行为，经常会形成一条长长的装饰链。
 ## 状态模式
+> 状态模式定义是: 允许一个对象在其内部状态改变的时候改变它的行为，对象看起来似乎改变了它的类。其中，关键是区分事物内部的状态，事物内部状态的改变往往会带来事物的行为改变。
+
+状态模式把事物的每种状态都封装成单独的类，跟此种状态有关的行为都被封装到这个类的内部。
+
+简单案例: 
+```javascript
+// 状态转换 a -> b -> c -> a -> ...
+var Astate = function(item) {
+    this.item = item;
+}
+Astate.prototype.change = function() {
+    // 改变状态
+    console.log('b');
+    this.item.setState(this.item.Bstate); // 切换到 B 状态
+}
+var Bstate = function(item) {
+    this.item = item;
+}
+Bstate.prototype.change = function() {
+    // 改变状态
+    console.log('c');
+    this.item.setState(this.item.Cstate); // 切换到 C 状态
+}
+var Cstate = function(item) {
+    this.item = item;
+}
+Cstate.prototype.change = function() {
+    // 改变状态
+    console.log('a');
+    this.item.setState(this.item.Astate); // 切换到 B 状态
+}
+/*************** item 类 ****************/
+var Item = function() {
+    this.Astate = new Astate(this);
+    this.Bstate = new Bstate(this);
+    this.Cstate = new Cstate(this);
+    this.currState = this.Astate;
+}
+// 触发改变状态事件
+Item.prototype.change = function() {
+    this.currState.change();
+}
+// 更新状态
+Item.prototype.setState = function(newState) {
+    this.currState = newState;
+}
+/*************** 案例 *******************/
+var item = new Item();
+item.change();
+```
+
+### 定义抽象类
+状态类中将定义一些共同的方法， Context 最终会将请求委托给状态对象的这些方法里。
+```javascript
+// 抽象类
+var State = function() {}
+State.prototype.change = function() {
+    throw new Error('父类的 change 方法必须被重写');
+}
+// 让子类继承
+var Astate = function(item) {this.item = item;}
+Astate.prototype = new State(); // 继承抽象父类
+Astate.prototype.change = function() {
+    // 重写父类方法
+    console.log('a');
+    this.item.setState(this.item.Bstate);
+}
+```
+文件上传程序
+```javascript
+// 上传插件
+var plugin = (function() {
+    var plugin = document.createElement('embed');
+    plugin.style.display = 'none';
+    plugin.type = 'application/txftn-webkit';
+    plugin.sign = function() {
+        console.log('开始文件扫描');
+    }
+    plugin.pause = function() {
+        console.log('暂停文件上传');
+    };
+    plugin.uploading = function() {
+        console.log('开始文件上传');
+    };
+    plugin.del = function() {
+        console.log('删除文件上传');
+    }
+    plugin.done = function() {
+        console.log('文件上传完成');
+    }
+    document.body.appendChild(plugin);
+    return plugin;
+})();
+// 构造函数,为每种状态子类都创建一个实例对象
+var Upload = function(fileName) {
+    this.plugin = plugin;
+    this.fileName = fileName;
+    this.button1 = null;
+    this.button2 = null;
+    this.signState = new SignState(this); // 设置初始状态为waiting
+    this.uploadingState = new UploadingState(this);
+    this.pauseState = new PauseState(this);
+    this.doneState = new DoneState(this);
+    this.errorState = new ErrorState(this);
+    this.currState = this.signState; // 设置当前状态
+};
+// 初始化上传的 DOM 节点，并开始绑定按钮事件
+Upload.prototype.init = function() {
+    var that = this;
+    this.dom = document.createElement('div');
+    this.dom.innerHTML =
+        '<span>文件名称:' + this.fileName + '</span>\
+<button data-action="button1">扫描中</button>\
+<button data-action="button2">删除</button>';
+    document.body.appendChild(this.dom);
+    this.button1 = this.dom.querySelector('[data-action="button1"]');
+    this.button2 = this.dom.querySelector('[data-action="button2"]');
+    this.bindEvent();
+};
+// 具体按钮事件的实现
+Upload.prototype.bindEvent = function() {
+    var self = this;
+    this.button1.onclick = function() {
+        self.currState.clickHandler1();
+    }
+    this.button2.onclick = function() {
+        self.currState.clickHandler2();
+    }
+};
+// 
+Upload.prototype.sign = function() {
+    this.plugin.sign();
+    this.currState = this.signState;
+};
+Upload.prototype.uploading = function() {
+    this.button1.innerHTML = '正在上传，点击暂停';
+    this.plugin.uploading();
+    this.currState = this.uploadingState;
+};
+Upload.prototype.pause = function() {
+
+    this.button1.innerHTML = '已暂停，点击继续上传';
+    this.plugin.pause();
+    this.currState = this.pauseState;
+};
+Upload.prototype.done = function() {
+    this.button1.innerHTML = '上传完成';
+    this.plugin.done();
+    this.currState = this.doneState;
+};
+Upload.prototype.error = function() {
+    this.button1.innerHTML = '上传失败';
+    this.currState = this.errorState;
+};
+Upload.prototype.del = function() {
+    this.plugin.del();
+    this.dom.parentNode.removeChild(this.dom);
+};
+// 实现各种状态类，使用状态工厂
+var StateFactory = (function() {
+    var State = function() {};
+    State.prototype.clickHandler1 = function() {
+        throw new Error('子类必须重写父类的clickHandler1 方法');
+    }
+    State.prototype.clickHandler2 = function() {
+        throw new Error('子类必须重写父类的clickHandler2 方法');
+    }
+    return function(param) {
+        var F = function(uploadObj) {
+            this.uploadObj = uploadObj;
+        };
+        F.prototype = new State();
+        for (var i in param) {
+            F.prototype[i] = param[i];
+        }
+        return F;
+    }
+})();
+
+var SignState = StateFactory({
+    clickHandler1: function() {
+        console.log('扫描中，点击无效...');
+    },
+    clickHandler2: function() {
+        console.log('文件正在上传中，不能删除');
+    }
+});
+var UploadingState = StateFactory({
+    clickHandler1: function() {
+        this.uploadObj.pause();
+    },
+    clickHandler2: function() {
+        console.log('文件正在上传中，不能删除');
+    }
+});
+var PauseState = StateFactory({
+    clickHandler1: function() {
+        this.uploadObj.uploading();
+    },
+    clickHandler2: function() {
+        this.uploadObj.del();
+    }
+});
+var DoneState = StateFactory({
+    clickHandler1: function() {
+        console.log('文件已完成上传, 点击无效');
+    },
+    clickHandler2: function() {
+        this.uploadObj.del();
+    }
+});
+var ErrorState = StateFactory({
+    clickHandler1: function() {
+        console.log('文件上传失败, 点击无效');
+    },
+    clickHandler2: function() {
+        this.uploadObj.del();
+    }
+});
+
+var uploadObj = new Upload('JavaScript 设计模式与开发实践');
+uploadObj.init();
+window.external.upload = function(state) {
+    uploadObj[state]();
+};
+window.external.upload('sign');
+setTimeout(function() {
+    window.external.upload('uploading'); // 1 秒后开始上传
+}, 1000);
+setTimeout(function() {
+    window.external.upload('done'); // 5 秒后上传完成
+}, 5000);
+```
+状态模式优点:
+- 定义了状态与行为之间的关系，将它们封装在一个类里。通过增加新的状态类，增加新的状态和转换。
+- 避免 Context 无限膨胀，状态切换的逻辑被分布在状态类中
+- 用对象替代字符串来记录当前状态，使得状态切换一目了然。
+- Context 中的请求动作和状态类中封装的行为可以容易地独立变化互不影响。
+
+缺点是定义了许多状态类，不易于维护。
+
+性能优化点:
+1. 管理 state 对象的创建和销毁:
+   1. 仅当 state 对象被需要时才创建并随后销毁。适用于对象较庞大的情况
+   2. 一开始就创建好所有状态对象，并且始终不销毁。使用与状态改变频繁的情况
+2. 利用享元模式，每个 Context 对象都共享一个 state 对象
+   
+### 和策略模式关系
+状态模式和策略模式都封装了一系类的算法或行为，相同点是，它们都有一个上下文、一些策略或者状态，上下文把请求委托给这些类执行。
+
+区别是策略模式中各个策略类之间是平等又平行的，没有任何联系；状态模式中，状态和状态对应行为时早已封装好的，状态之间切换也早规定完成，改变行为这件事发生在状态内部。
+
 ## 适配器模式
+> 适配器模式作用是解决两个软件实体间的接口不兼容的问题。
+
+```javascript
+var EventA = {
+    A: function() {
+        console.log('说英语');
+    }
+}
+var EventB = {
+    B: function() {
+        console.log('说中文');
+    }
+}
+// B 的适配器
+var Badapter = {
+    A: function() {
+        return EventB.B();
+    }
+}
+// 调用交流的函数
+var communicate = function(item) {
+    if(item.A instanceof Function) {
+        item.A();
+    }
+}
+communicate(A);
+communicate(Badapter);
+```
+适配器模式还可以用于数据格式转换。有一些模式跟适配器模式的结构非常相似，比如装饰者模式，代理模式和外观模式。这几种模式都属于包装模式，都是由一个对象来包装另一个对象。区别它们的关键仍是模式的意图。
+- 装饰者模式主要用来解决两个已有接口之间不匹配的问题。不需要改变已有的接口，就能使它们协同作用
+- 装饰者模式和代理模式也不会改变原有对象接口，但装饰者模式的作用是为了给对象增加功能，常常有一条常常的装饰链；而适配器模式只包装一次，代理模式为了控制对对象的访问，也只包装一次
+- 外观模式和适配器相似，外观模式的显著特点是定义了一个新的接口。
 
 # 设计原则和编程技巧
+设计原则通常指的是单一职责原则、里氏替换原则、依赖倒置原则、接口隔离原则、合成复用原则和最少知识原则。
+
 ## 单一职责原则
+> 单一职责原则(SPR)体现为: 一个对象(方法)只做一件事情。
+
+1. 代理模式: 虚拟代理把预加载的职责放到代理对象中
+2. 迭代器模式: 提供聚合访问对象的方法
+3. 单例模式: 只负责创建对象
+4. 装饰者模式: 动态给对象增加职责,是一种分离职责的方式
+
+### 何时分离职责
+1. 如果随着需求的变化，有两个职责总是同时变化，那就不必分离他们。
+2. 职责的变化轴线仅当它们确定会发生变化时才具有意义，即使两个职责已经耦合在一起，但它们没有发生改变的征兆，就没必要分离它们，在需要重构时再分离
+   
+### SPR 原则优缺点:
+优点是降低了单个类或者对象的复杂度，按照职责把对象分解更小的粒度，这有助于代码的复用和单元测试。
+
+缺点是会明显增加编写代码的复杂度，把对象分解成更小的粒度之后，实际上也增大了这些对象之间相互联系的难度。
+
 ## 最少知识原则
+> 最少知识原则(LKP),也叫迪米特法则(Law of Demeter, LoD)说的是一个软件实体应当尽可能少地与其他实体发生相互作用。
+
+最少知识原则要求我们设计程序时，应当尽量减少对象之间的交互。如果两个对象之间不必彼此直接同学，那么这两个对象就不要发生直接的相互联系。常见做法是引入一个第三者对象，承担这些对象之间的通信作用。
+
+1. 中介者模式: 通过增加一个中介对象，让所有相关对象都通过中介者对象来通信，而不是相互引用。
+2. 外观模式: 为子系统中的一组接口提供一个一致的界面，外观模式定义了一个高层接口，这个接口使子系统更加容易使用。
+   
+    外观模式的作用是对客户屏蔽一组子系统的复杂性。
+    ```javascript
+    var A = function() {
+        a1();
+        a2();
+    }
+    var B = function() {
+        b1();
+        b2();
+    }
+    var facade = function() {
+        A();
+        B();
+    }
+    facade();
+    ```
+    外观模式容易跟普通封装混淆。这两者都封装了一些事物，但外观模式关键是定义一个高层接口去封装一组"子系统"。外观模式作用主要有两点:
+    1. 为一组子系统提供一个简单便利的访问入口
+    2. 隔离客户与复杂子系统之间的联系，客户不用去了解子系统的细节。
+### 封装在最少知识中体现
+封装很大程度上表达的是对数据的隐藏，包括用来限制变量的作用域。
+
+JavaScript 变量作用域规定:
+- 变量在全局声明，或者在代码的任何位置隐式声明(不用 var),则该变量全局可见；
+- 变量在函数内显式什么(用 var), 则在函数内可见
+
+把变量可见性限制在一个尽可能小的范围内，这个变量对其他模块影响越小，变量被改写和发生冲突的机会也越小。
+
 ## 开放-封闭原则
+> 软件实体(类、模块、函数)等应该是可以扩展的，但是不可修改的
+
+扩展函数功能，有两种方式，一种是修改原有代码，一种是增加一段新的代码。
+
+开发-封闭原则思想: 当需要改变一个程序的功能或者给这个程序增加新功能的时候，可以使用增加代码的方式，但不允许改动程序源代码。
+
+过多的条件分支语句是造成程序违反开发-封闭原则的一个常见原因。利用多态可以解决这个问题，把不变的部分隔离出来，把可变的部分封装起来。
+
+除了多态，还有
+1. 放置挂钩(hook)是分离变化的一种方法。在程序可能发生变化的地方挂置一个钩挂，挂钩返回结果决定程序走向。
+2. 使用回调函数
+
+### 设计模式中的开发-封闭原则
+1. 发布-订阅模式
+2. 模板方法模式: 侧重于继承
+3. 策略模式: 侧重于组合和委托
+4. 代理模式
+5. 职责链模式
+
+开放-封闭原则相对性：程序完全封闭是不容易做到的。太多抽象也会增加程序复杂度。可以先做到以下两点:
+1. 挑出最容易发生变化的地方，然后构造抽象来封闭这些变化
+2. 在不可避免发生修改的时候，尽量修改那些相对容易修改的地方。拿一个开源库来说，修改它提供的配置文件，总比修改它的源码来得简单。
+
 ## 接口和面向接口编程
+> 接口是对象能够响应的请求的集合。
+
+抽象类和 interface 的主要作用是
+1. 通过向上转型来隐藏对象的真正类型，以表现对象的多态性
+2. 约定类与类之间的一些契约行为。
+
+JavaScript 不需要向上转型，接口在 JavaScript 中最大的作用就退化到了检查代码的规范性。
+
+### 用鸭子类型进行接口检查
+鸭子类型时动态类型语言面向对象设计中的一个重要概念。利用鸭子类型思想，不必借助超类型的帮助，就能在动态类型语言中轻松地实现面向接口编程，而不是面向实现编程。
+
+利用鸭子类型思想判断一个对象是否是数组
+```javascript
+var isArray = function(obj) {
+    return obj &&
+        typeof obj === 'object' &&
+        typeof obj.length === 'number' &&
+        typeof obj.splice === 'function'
+}
+```
+可以使用 TypeScript 编写基于 interface 的命令模式
+
 ## 代码重构
+模式和重构之间有着一种与生俱来的关系。设计模式的目的就是为许多重构行为提供目标。
+
+- 提炼函数: 重构函数的好处:
+  1. 避免出现超大函数
+  2. 独立出来的函数有助于代码复用
+  3. 独立出来的函数更容易被复写
+  4. 独立出来的函数如果有一个良好的命名，本身就祈祷注释作用
+
+- 合并重复的条件片段
+- 把条件分支语句提炼成函数: 复杂的条件分支语句导致程序难以阅读和理解。可以把复杂条件语句提炼成一个单独的函数，能更准确表达代码意思，函数名本身又起到注释作用。
+- 合理使用循环
+    ```javascript
+    var createXHR = function() {
+        var versions = ['MSXML2.XMLHttp.6.Oddd', 'MSXML2.XMLHttp.3.0', 'MSXML2.XMLHttp'];
+        for(var i = 0, version; version = versions[i++];) {
+            try{
+                return new ActiveXObject(version);
+            } catch(e) {
+
+            }
+        }
+    };
+    var xhr = createXHR();
+    ```
+- 提前让函数退出代替嵌套条件分支
+- 传递对象参数代替过长的参数列表：如果参数过多，函数就难以理解，还要记住参数的传递顺序，可以把参数都放入一个对象内，便于维护。
+- 尽量减少参数数量
+- 少用三目运算符
+- 合理使用链式调用：链式应用结构相对稳定，后期不易发生修改。如果结构容易发生变化，则建议使用普通调用方式
+    ```javascript
+    var User = {
+        id: null,
+        name: null,
+        setId: function(id) {
+            this.id = id;
+            return this;
+        },
+        setName: function(name) {
+            this.name = name;
+            return this;
+        }
+    };
+    console.log(User.setId(1314).setName('sven'));
+    ```
+- 分解大型类: 拆分大型的类，使类精简，便于理解
+- 用 return 退出多重循环
