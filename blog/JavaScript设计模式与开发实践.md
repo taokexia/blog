@@ -39,8 +39,11 @@
         - [适用性](#适用性)
         - [对象池](#对象池)
     - [职责链模式](#职责链模式)
+        - [用 AOP 实现职责链](#用-aop-实现职责链)
     - [中介者模式](#中介者模式)
     - [装饰者模式](#装饰者模式)
+        - [用 AOP 装饰函数](#用-aop-装饰函数)
+        - [装饰者模式和代理模式](#装饰者模式和代理模式)
     - [状态模式](#状态模式)
     - [适配器模式](#适配器模式)
 - [设计原则和编程技巧](#设计原则和编程技巧)
@@ -1622,8 +1625,282 @@ setTimeout(function() {
 ```
 对象池是另外一种性能优化方案，它跟享元模式有些相似之处，但没有分离内部状态和外部状态这个过程。
 ## 职责链模式
+> 定义: 使多个对象都有机会处理请求，从而避免请求的发送者和接收者之间的耦合关系，将这些对象连成一条链，并沿着这条链传递该请求，直到有一个对象处理它为止。
+
+```javascript
+// 职责链节点函数
+var order500 = function( orderType, pay, stock ){
+    if ( orderType === 1 && pay === true ){
+        console.log( '500 元定金预购，得到100 优惠券' );
+    }else{
+        return 'nextSuccessor'; // 我不知道下一个节点是谁，反正把请求往后面传递
+    }
+};
+var order200 = function( orderType, pay, stock ){
+    if ( orderType === 2 && pay === true ){
+        console.log( '200 元定金预购，得到50 优惠券' );
+    }else{
+        return 'nextSuccessor'; // 我不知道下一个节点是谁，反正把请求往后面传递
+    }
+};
+var orderNormal = function( orderType, pay, stock ){
+    if ( stock > 0 ){
+        console.log( '普通购买，无优惠券' );
+    }else{
+        console.log( '手机库存不足' );
+    }
+};
+// 包装函数的职责链节点
+var Chain = function( fn ){
+    this.fn = fn; 
+    this.successor = null;
+};
+//  指定在链中的下一个节点
+Chain.prototype.setNextSuccessor = function( successor ){
+    return this.successor = successor;
+};
+// 传递请求给某个节点
+Chain.prototype.passRequest = function(){
+    var ret = this.fn.apply( this, arguments );
+    if ( ret === 'nextSuccessor' ){
+        return this.successor && this.successor.passRequest.apply( this.successor, arguments );
+    }
+    return ret;
+};
+// 异步职责链,手动传递请求给职责链下个节点
+Chain.prototype.next = function() {
+    return this.successor && this.successor.passRequest.apply(this.successor, arguments);
+}
+
+// 案例:
+var chainOrder500 = new Chain( order500 );
+var chainOrder200 = new Chain( order200 );
+var chainOrderNormal = new Chain( orderNormal );
+// 设置下一个节点
+chainOrder500.setNextSuccessor( chainOrder200 );
+chainOrder200.setNextSuccessor( chainOrderNormal );
+chainOrder500.passRequest( 1, true, 500 ); // 输出：500 元定金预购，得到100 优惠券
+chainOrder500.passRequest( 2, true, 500 ); // 输出：200 元定金预购，得到50 优惠券
+```
+职责链模式的最大优点是解耦了请求发送者和N个接受者之间的复杂关系。除此之外，还可以手动指定起始节点，请求并不是非得从链中第一个节点开始传递。
+
+缺陷是不能保证某个请求一定会被链中节点处理，可以在链尾增加一个保底接收者来处理这些请求。从性能方面考虑，要避免过长的职责链。
+
+### 用 AOP 实现职责链
+```javascript
+Function.prototype.after = function( fn ){
+    var self = this;
+    return function(){
+        var ret = self.apply( this, arguments );
+        if ( ret === 'nextSuccessor' ){
+            return fn.apply( this, arguments );
+        }
+        return ret;
+    }
+};
+
+var order = order500.after( order200 ).after( orderNormal );
+order( 1, true, 500 ); // 输出：500 元定金预购，得到100 优惠券
+order( 2, true, 500 ); // 输出：200 元定金预购，得到50 优惠券
+```
+用 AOP 实现职责链简单、巧妙，同时叠加了函数的作用域，如果链条过长，仍会影响性能。
+
 ## 中介者模式
+> 中介者模式作用是解除对象与对象之间的紧耦合关系。增加一个中介者对象后，所有相关对象都通过中介者对象通信，而不是相互引用，当对象发生改变时，通知中介者对象即可。
+
+中介者对象使得网状的多对多关系变成一对多关系。实现中介者对象的两种方式:
+1. **利用发布-订阅模式**，中介者对象为订阅者，各个对象为发布者，一旦对象状态改变，发送消息给中介者对象。
+2. **向外开放接收消息接口**，通过往接口传递参数来给中介者对象发送消息。
+
+中介者模式应用于游戏案例: 
+```javascript
+// 定义 玩家类
+function Player(name, teamColor){
+    this.name = name; // 角色名字
+    this.teamColor = teamColor; // 队伍颜色
+    this.state = 'alive'; // 玩家生存状态
+};
+// 获胜
+Player.prototype.win = function(){
+    console.log(this.name + ' won ');
+};
+// 失败
+Player.prototype.lose = function(){
+    console.log(this.name +' lost');
+};
+// 死亡
+Player.prototype.die = function(){
+    this.state = 'dead';
+    playerDirector.reciveMessage('playerDead', this); // 给中介者发送消息，玩家死亡
+};
+// 移除
+Player.prototype.remove = function(){
+    playerDirector.reciveMessage('removePlayer', this); // 给中介者发送消息，移除一个玩家
+};
+// 玩家换队
+Player.prototype.changeTeam = function(color){
+    playerDirector.reciveMessage('changeTeam', this, color); // 给中介者发送消息，玩家换队
+};
+/*************** 生成玩家的工厂 ***************/
+var playerFactory = function(name, teamColor) {
+    var newPlayer  = new Player(name, teamColor);
+    playerDirector.reciveMessage('addPlayer', newPlayer);
+    return newPlayer;
+}
+/*************** 中介者对象 ******************/
+var playerDirector= (function(){
+    var players = {}; // 保存所有玩家
+    var operations = {}; // 中介者可以执行的操作
+    /******** 新增一个玩家 ****************/
+    operations.addPlayer = function(player){
+        var teamColor = player.teamColor; // 玩家的队伍颜色
+        players[teamColor] = players[teamColor] || []; // 如果该颜色的玩家还没有成立队伍，则
+        players[teamColor].push(player); // 添加玩家进队伍
+    };
+    /******** 移除一个玩家 ******************/
+    operations.removePlayer = function(player){
+        var teamColor = player.teamColor, // 玩家的队伍颜色
+        teamPlayers = players[teamColor] || []; // 该队伍所有成员
+        for ( var i = teamPlayers.length - 1; i >= 0; i-- ){ // 遍历删除
+            if (teamPlayers[i] === player){
+                teamPlayers.splice(i, 1);
+            }
+        }
+    };
+    /******** 玩家换队 *****************/
+    operations.changeTeam = function(player, newTeamColor){ // 玩家换队
+        operations.removePlayer(player); // 从原队伍中删除
+        player.teamColor = newTeamColor; // 改变队伍颜色
+        operations.addPlayer(player); // 增加到新队伍中
+    };
+    /******** 玩家死亡 *****************/
+    operations.playerDead = function(player){ // 玩家死亡
+        var teamColor = player.teamColor,
+        teamPlayers = players[teamColor]; // 玩家所在队伍
+        var all_dead = true;
+        for (var i = 0, player; player = teamPlayers[ i++ ];){
+            if (player.state !== 'dead'){
+                all_dead = false;
+                break;
+            }
+        }
+        if (all_dead === true){ // 全部死亡
+            for (var i = 0, player; player = teamPlayers[i++];){
+                player.lose(); // 本队所有玩家lose
+            }
+            for (var color in players){
+                if (color !== teamColor){
+                    var teamPlayers = players[color]; // 其他队伍的玩家
+                    for (var i = 0, player; player = teamPlayers[i++];){
+                        player.win(); // 其他队伍所有玩家win
+                    }
+                }
+            }
+        }
+    };
+    /******** 对外暴露接口 *****************/
+    var reciveMessage = function(){
+        var message = Array.prototype.shift.call(arguments); // arguments 的第一个参数为消息名称
+        operations[message].apply(this, arguments);
+    };
+    return {
+        reciveMessage: reciveMessage
+    }
+})();
+// 案例
+// 红队：
+var player1 = playerFactory( '皮蛋', 'red' ),
+player2 = playerFactory( '小乖', 'red' ),
+player3 = playerFactory( '宝宝', 'red' ),
+player4 = playerFactory( '小强', 'red' );
+// 蓝队：
+var player5 = playerFactory( '黑妞', 'blue' ),
+player6 = playerFactory( '葱头', 'blue' ),
+player7 = playerFactory( '胖墩', 'blue' ),
+player8 = playerFactory( '海盗', 'blue' );
+player1.die();
+player2.die();
+player3.die();
+player4.die();
+```
+中介者模式是迎合迪米特法则的一种实现。迪米特法则也叫最少知识原则，指一个对象应该尽可能少地了解另外的对象。减少耦合性。中介者模式的缺点是系统中会新增一个中介者对象，且中介者对象复杂又巨大，是一个难以维护的对象。
 ## 装饰者模式
+> 装饰者模式: 给对象动态增加职责。能够在不改变对象自身的基础上，在程序运行期间给对象动态地添加职责。
+
+装饰函数: 为函数添加新功能，可以通过保存函数的引用，在不违反开放-封闭的前提下，给函数增加新功能
+```javascript
+var a = function() {console.log(1);}
+var _a = a;
+a = function() {_a(); console.log(2);}
+a();
+```
+在没有修改原来函数的基础上给函数增加新的功能，缺陷是: 必须再维护一个中间变量； 可能遇到 this 被劫持的问题。
+### 用 AOP 装饰函数
+```javascript
+Function.prototype.before = function( beforefn ){
+    var __self = this; // 保存原函数的引用
+    return function(){ // 返回包含了原函数和新函数的"代理"函数
+        beforefn.apply( this, arguments ); // 执行新函数，且保证this 不被劫持，新函数接受的参数
+        // 也会被原封不动地传入原函数，新函数在原函数之前执行
+        return __self.apply( this, arguments ); // 执行原函数并返回原函数的执行结果，
+        // 并且保证this 不被劫持
+    }
+}
+
+Function.prototype.after = function( afterfn ){
+    var __self = this;
+    return function(){
+        var ret = __self.apply( this, arguments );
+        afterfn.apply( this, arguments );
+        return ret;
+    }
+};
+```
+表单验证案例:
+```javascript
+var username = document.getElementById('username');
+var password = document.getElementById('password');
+var submitBtn = document.getElementById('submitBtn');
+// 装饰者模式
+Function.prototype.before = function(beforefn) {
+    var __self = this;
+    return function() {
+        if (beforefn.apply(this, arguments) === false) {
+            // beforefn 返回false 的情况直接return，不再执行后面的原函数
+            return;
+        }
+        return __self.apply(this, arguments);
+    }
+}
+// 检验函数
+var validata = function() {
+    if (username.value === '') {
+        alert('用户名不能为空');
+        return false;
+    }
+    if (password.value === '') {
+        alert('密码不能为空');
+        return false;
+    }
+}
+// 发送请求
+var formSubmit = function() {
+    var param = {
+        username: username.value,
+        password: password.value
+    }
+    ajax('http:// xxx.com/login', param);
+}
+// 在发送请求前进行标签验证
+formSubmit = formSubmit.before(validata);
+submitBtn.onclick = function() {
+    formSubmit();
+}
+```
+### 装饰者模式和代理模式
+装饰者模式和代理模式结构类似，两种模式都描述了怎么为对象提供一定程度上的简介引用，它们实现部分都保留了对另外一个对象的引用，并向这个对象发送请求。
+
+最重要的区别在于它们的意图和设计目的。代理模式目的是当直接访问本体不方便或者不符合需要时，为这个本体提供一个替代者，通常只有一层代理-本体的引用，强调了代理和本体的关系。装饰者模式作用是为对象动态加入行为，经常会形成一条长长的装饰链。
 ## 状态模式
 ## 适配器模式
 
