@@ -1,3 +1,9 @@
+> 书名: JavaScript 设计模式与开发实战<br>
+> 出版社: 图灵社区<br>
+> 网页： http://www.ituring.com.cn/book/1632
+
+
+![思维导图](../images/思维导图/JavaScript设计模式与开发实战.png)
 <!-- TOC -->
 
 - [基础知识](#基础知识)
@@ -158,59 +164,59 @@ JavaScript的 this 总是指向一个对象，而具体指向哪个对象实在�
 
 除去不常用的 with 和 eval 情况，具体到实际应用中， this 的指向大致情况分四种:
 1. 作为对象的方法调用:当函数作为对象方法调用时， this 指向该对象
-```javascript
-var obj = {
-    a: 1,
-    getA: function() {
-        alert(this === obj); // true
-        alert(this.a); // 输出: 1
+    ```javascript
+    var obj = {
+        a: 1,
+        getA: function() {
+            alert(this === obj); // true
+            alert(this.a); // 输出: 1
+        }
     }
-}
-obj.getA();
-```
+    obj.getA();
+    ```
 2. 作为普通函数调用:当函数不作为对象被调用时，this 总指向全局对象。这个全局对象是 window 对象.
-```javascript
-window.name = 'globalName';
-var getName = function() {
-    return this.name;
-}
-console.log(getName()); // globalName
-```
-ECMAScript5 严格模式下，this 指向 undefined
-
-3. 构造器调用: 当 new 运算符调用函数时，该函数总会返回一个对象， this 指向这个对象
-```javascript
-var MyClass = function() {
-    this.name = 'sven';
-}
-var obj = new MyClass();
-alert(obj.name); // sven;
-```
-> 需要注意的是，如果构造器显式返回一个object类型的对象，那么此次运算结果最终会返回这个对象，而不是 this:
-```javascript
-var MyClass = function() {
-    this.name = 'sven';
-    return { // 显式返回一个对象
-        name: 'name'
-    }
-}
-var obj = new MyClass();
-alert(obj.name); // name;
-```
-4. `Function.prototype.call` 或 `Function.prototype.apply` 调用: 可以动态改变传入的 this， 函数式编程的常用函数
-```javascript
-var obj1 = {
-    name: 'sven',
-    getName: function() {
+    ```javascript
+    window.name = 'globalName';
+    var getName = function() {
         return this.name;
     }
-};
-var obj2 = {
-    name: 'name'
-};
-console.log(obj1.getName()); // sven
-console.log(obj1.getName.call(obj2)); // name
-```
+    console.log(getName()); // globalName
+    ```
+    ECMAScript5 严格模式下，this 指向 undefined
+
+3. 构造器调用: 当 new 运算符调用函数时，该函数总会返回一个对象， this 指向这个对象
+    ```javascript
+    var MyClass = function() {
+        this.name = 'sven';
+    }
+    var obj = new MyClass();
+    alert(obj.name); // sven;
+    ```
+    > 需要注意的是，如果构造器显式返回一个object类型的对象，那么此次运算结果最终会返回这个对象，而不是 this:
+    ```javascript
+    var MyClass = function() {
+        this.name = 'sven';
+        return { // 显式返回一个对象
+            name: 'name'
+        }
+    }
+    var obj = new MyClass();
+    alert(obj.name); // name;
+    ```
+4. `Function.prototype.call` 或 `Function.prototype.apply` 调用: 可以动态改变传入的 this， 函数式编程的常用函数
+    ```javascript
+    var obj1 = {
+        name: 'sven',
+        getName: function() {
+            return this.name;
+        }
+    };
+    var obj2 = {
+        name: 'name'
+    };
+    console.log(obj1.getName()); // sven
+    console.log(obj1.getName.call(obj2)); // name
+    ```
    
 ### 丢失的 this
 替代函数 `document.getElementById` 这个过长的函数,使用:

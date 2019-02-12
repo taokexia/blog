@@ -9,7 +9,14 @@
     - [编写有趣的应用](#编写有趣的应用)
         - [创建一个聊天服务器](#创建一个聊天服务器)
         - [编写一个 Twitter](#编写一个-twitter)
+    - [编写健壮的 Node 程序](#编写健壮的-node-程序)
+        - [事件循环](#事件循环)
+        - [模式](#模式)
+        - [编写产品代码](#编写产品代码)
+            - [差错处理](#差错处理)
+            - [使用多处理器](#使用多处理器)
 - [API和常用模块](#api和常用模块)
+    - [核心 API](#核心-api)
 
 <!-- /TOC -->
 
@@ -138,7 +145,7 @@ Express 模块针对 Node 的 Web 框架为现有的 http 服务器模块添加�
 ```
 npm install express
 ```
-
+Express 围绕着请求路由的方式支持 MVC 结构(模板、视图、控制器)。控制路由与控制器类似，提供了把数据模型和视图相结合的方法。
 Express 应用基本文件结构
 ```
 ├── app.js
@@ -159,14 +166,30 @@ app.listen(8000);
 var tweets = [];
 
 app.get('/', function(req, res) {
-    res.send('Welcome to Node Twitter');
+    var title = 'Chirpie';
+    var header = 'Welcome to Chirpie';
+    // 调用函数渲染模板
+    res.render('index', {
+        // 定义渲染的数据
+        locals: {
+            'title': title,
+            'header': header,
+            'tweets': tweets,
+            'stylesheets': ['/public/style.css']
+        }
+    })
 });
 //  bodyParser 中间件，处理 POST 数据
 app.post('/send', express.bodyParser(), function(req, res) {
     // 判断是否有数据
     if(req.body && req.body.tweet) {
         tweets.push(req.body.tweet);
-        res.send({status:"ok", message: "Tweet received"});
+        // 重定向网址
+        if(acceptsHtml(req.headers['accept'])) {
+            res.redirect('/', 302);
+        } else {
+            res.send({status:"ok", message: "Tweet received"});
+        }
     } else {
         res.send({status:"nok", message:"No tweet received"})
     }
@@ -175,6 +198,15 @@ app.post('/send', express.bodyParser(), function(req, res) {
 app.get('/tweets', function(req, res) {
     res.send(tweets);
 })
+// 检查 accept 头是否包含 text/html
+function acceptsHtml(header) {
+    var accepts = header.split(',');
+    for(var i = 0; i < accepts.length; i+= 0) {
+        if(accepts[i] === 'text/html')
+            return true;
+    }
+    return false;
+}
 ```
 `express.bodyParser()` 中间件，处理 POST 数据,要求请求头 `content-type`属性是 `application/x-www-form-urlencoded`或`application/json`。保持到 `req.body` 中。
 
@@ -190,6 +222,7 @@ var opts = {
     method: 'POST',
     headers: {'content-type': 'application/x-www-form-urlencoded'}
 };
+// 创建新的 http 请求
 var req = http.request(opts, function(res) {
     res.setEncoding('utf8');
     var data = "";
@@ -197,10 +230,195 @@ var req = http.request(opts, function(res) {
         data += d;
     })
     res.on('end', function() {
+        // 测试结果是否符合预期
         assert.strictEqual(data, '{"status": "ok", "message": "Tweet received"}');
     });
 });
 req.write('tweet=test');
 req.end();
 ```
+利用 assert 模块进行返回值测试
+
+EJS布局模板文件 layout 文件定义了网站的主架，`<% %>` 标签之间的是js代码。
+
+partial() 保存重复利用的代码片段。 body 变量包含我们有渲染的模板
+```html
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <%- partial('partials/stylesheet', stylesheets) %>
+        <title><%= title %></title>
+    </head>
+    <body>
+        <h1><%= header %></h1>
+        <%- body %>
+    </body>
+</html>
+```
+
+index模板
+```html
+<form action="/send" method="POST">
+    <input type="text" length="140" name="tweet">
+    <input type="submit" value="Tweet">
+</form>
+<%- partial('partials/chirp', tweets) %>
+```
+chirp模板
+```html
+<p><%= chirp %></p>
+<link rel="stylesheet" type="text/css" href="<%- stylesheet %>">
+```
+
+## 编写健壮的 Node 程序
+### 事件循环
+Node 的核心是事件循环。利用事件循环来处理系统各部分请求。Node 所有的 I/O 事件都是非阻塞的，所以 Node 会用到很多回调函数，但 Node 只以单线程运行。
+
+Node 是一个非阻塞系统，当调用需要阻塞等待的数据库时，会采用回调函数替代闲置等待。
+```js
+var EE = require('events').EventEmitter;
+var ee = new EE();
+var die = false;
+
+ee.on('die', function() {
+    die = true;
+})
+setTimeout(function() {
+    ee.emit('die');
+}, 100);
+while(!die) {
+
+}
+console.log('done');
+```
+`done`永远不会被输出，因为while不会让 Node 触发 setTimeout 回调。 Node 同时只能处理一件事。
+
+编写 Node.js 服务器策略:
+- 在设置完成后，所有操作都是事件驱动的
+- 需要长时间处理数据，需要考虑把它分配给 web worker 处理。
+
+### 模式
+I/O 问题:
+- 串行
+- 并行： 可以解决无限延迟事件的影响
+  - 有序: 嵌入函数
+    ```js
+    server.on('request', function(req, res) {
+        // 获取 session 信息
+        memcached.getSession(req, function(session) {
+            // 从 db 获取信息
+            db.get(session.user, function(userData) {
+                // 其他服务器调用
+                ws.get(req, function(wsData) {
+                    // 渲染页面
+                    page = pageRender(req, session, userData, wsData);
+                    res.write('page');
+                })
+            })
+        })
+    });
+    ```
+  - 无序: 运行顺序不确定
+    ```js
+    fs.readFile('foo.txt', 'utf8', function(err, data) {
+        console.log(data);
+    });
+    fs.readFile('bar.txt', 'utf8', function(err, data) {
+        console.log(data);
+    })
+    ```
+
+### 编写产品代码
+#### 差错处理
+JavaScript 提供了 try/catch 捕获错误，但在 Node 中，由于 I/O 隔离、异步调用，导致有些错误不会被捕获。通过 err 事件捕获 I/O 错误。
+```javascript
+req.on('error', function(e) {
+    console.log('error');
+})
+```
+#### 使用多处理器
+Node 是当线程的。Node 提供了一个 cluster 模块，可以把任务分配给子进程，就是把当前程序复制一份到另一个进程(Windows上，其实是另外一个线程)。主进程管理所有子进程，但 I/O 操作相互独立。
+
+```javascript
+var cluster = require('cluster');
+var http = require('http');
+// 获得 CPU 数量
+var numCPUs = require('os').cpus().length;
+if(cluster.isMaster) {
+    // 创建工作进程
+    for(var i = 0; i < numCPUs; i++) {
+        cluster.fork();
+    }
+
+    cluster.on('death', function(worker) {
+        console.log('worker' + worker.pid + ' died');
+    });
+} else { // 可用 isWorker 判断
+    // 工作进程创建 http 服务器
+    http.Server(function(req, res) {
+        res.writeHead(200);
+        res.end("hello world\n");
+    }).listen(8000); // 在启动一个 node 报 EADDRINUSE 端口已被使用
+}
+```
+cluster 提供了跨平台时让许多个进程共享 socket 的方法。cluster还能做很多事，因为它是基于 `child_process` 模块的。提供一系列属性。
+
+消息传递
+```javascript
+var rssWarn = (12 * 1024 * 1024);
+var heapWarn = (10 * 1024 * 1024);
+var workers = {};
+if(cluster.isMaster) {
+    // 创建工作进程
+    for(var i = 0; i < numCPUs; i++) {
+        // 创建进程
+        createWorker();
+    }
+    // 循环判断 清楚运行时间过长的子进程
+    setInterval(function() {
+        var time = new Date().getTime();
+        for(pid in workers) {
+            if(workers.hasOwnProperty(pid) && workers[pid].lastCb + 5000 < time) {
+                console.log('Long running worker' + pid + 'killed');
+                workers[pid].worker.kill();
+                delete workers[pid];
+                createWorker();
+            }
+        }
+    }, 1000);
+} else { // 可用 isWorker 判断
+    // 工作进程创建 http 服务器
+    http.Server(function(req, res) {
+        // 打乱 200 个请求的一个
+        if(Math.floor(Math.random() * 200) === 4) {
+            console.log('Stopped' + process.pid + 'from ever finishing');
+            while(true) {continue};
+        }
+        res.writeHead(200);
+        res.end("hello world from "+process.pid+"\n");
+    }).listen(8000); // 在启动一个 node 报 EADDRINUSE 端口已被使用
+    // 每秒报告一次
+    setInterval(function report() {
+        process.send({cmd: "reportMem", memory: process.memoryUsage(). process: process.pid});
+    }, 1000);
+}
+function createWorker() {
+    var worker = cluster.fork();
+    console.log('Created Worker:' + worker.pid);
+    // 允许开机时间
+    workers[worker.pid] = {worker: worker, lastCb: new Date().getTime()+1000}
+    worker.on('message', function(m) {
+        if(m.cmd === 'reportMem') {
+            workers[m.process].lastCb = new Date().getTime();
+            if(m.memory) {
+                if(m.memory.rss > rssWarn)
+                    console.log('Worker '+m.process+' using too much memory');
+            }
+        }
+    });
+}
+```
+有一个风险是事件回调运行了很长时间，导致进程其他用户需要等待很长时间才能得到服务。唯一补救方法是杀掉工作进程，而这会丢失它正在执行工作。
 # API和常用模块
+## 核心 API

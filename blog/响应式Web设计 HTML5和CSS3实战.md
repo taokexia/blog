@@ -49,6 +49,8 @@
     - [高分辨率背景图像](#高分辨率背景图像)
     - [CSS 滤镜](#css-滤镜)
 - [SVG 与响应式 Web 设计](#svg-与响应式-web-设计)
+    - [根元素](#根元素)
+    - [在网页中插入](#在网页中插入)
 - [CSS3 过渡、变形和动画](#css3-过渡变形和动画)
 - [表单](#表单)
 - [实现响应式 Web 设计](#实现响应式-web-设计)
@@ -784,6 +786,41 @@ drop-shadow 语法与 box-shadow 类似
 多个滤镜用空格分隔。慎重使用滤镜效果，有时滤镜渲染会有很大开销。
 
 # SVG 与响应式 Web 设计
+SVG 可伸缩矢量图，是响应式设计十分重要的技术。
+
+SVG 是使用标记语言进行描述的。使用 XML 来进行描述。
+
+## 根元素
+根元素有 width、height 和 viewbox属性
+```html
+<svg width="198px" height="188px" viewBox="0 0 198 198"></svg>
+```
+视框规定了所有形状都应遵守的坐标系。还可用于缩放图片。
+
+命名空间往往只在生成 SVG 的程序中使用
+```
+xmlns:sketch="..."
+```
+- 标题`<title>`和描述标签`<desc>`提高 SVG 文档可读性。
+- `<defs>`标签，储存所有可复用元素定义的地方
+- `<g></g>` 把其他元素捆版在一起
+- `<polygon>` 多边形
+- SVG路径是有任意数量的连接点组成。
+
+## 在网页中插入
+1. 使用 img 标签
+    ```html
+    <img src="a.svg" alt="svg">
+    ```
+2. 使用 object 标签
+    ```html
+    <object data="img/svgfile.svg" type="image/svg+xml">
+        <span>support SVG</span>
+    </object>
+    ```
+    data 属性是链接SVG资源方式。type描述内容 MIME 的类型。
+3. 作为背景图片插入`background-imaage: url('a.svg')`
+4. 内联
 # CSS3 过渡、变形和动画
 # 表单
 # 实现响应式 Web 设计
