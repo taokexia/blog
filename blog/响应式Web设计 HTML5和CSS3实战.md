@@ -25,7 +25,29 @@
     - [在 HTML5 中嵌入媒体](#在-html5-中嵌入媒体)
     - [关于 "离线优先"](#关于-离线优先)
 - [CSS3 新特性](#css3-新特性)
+    - [CSS 响应式多列布局](#css-响应式多列布局)
+    - [断字](#断字)
+    - [创建水平滚动面板](#创建水平滚动面板)
+    - [CSS 中创建分支](#css-中创建分支)
+        - [Modernizr](#modernizr)
+    - [新 CSS3 选择符](#新-css3-选择符)
+    - [自定义属性和变量](#自定义属性和变量)
+    - [CSS calc](#css-calc)
+    - [相对视口长度](#相对视口长度)
+    - [Web 排版](#web-排版)
+    - [CSS3 的新颜色格式及透明度](#css3-的新颜色格式及透明度)
 - [CSS3 高级技术](#css3-高级技术)
+    - [文字阴影特效](#文字阴影特效)
+    - [盒阴影](#盒阴影)
+        - [内阴影](#内阴影)
+    - [背景渐变](#背景渐变)
+        - [线性渐变语法](#线性渐变语法)
+        - [径向渐变背景](#径向渐变背景)
+        - [重复渐变](#重复渐变)
+    - [背景大小](#背景大小)
+    - [背景位置](#背景位置)
+    - [高分辨率背景图像](#高分辨率背景图像)
+    - [CSS 滤镜](#css-滤镜)
 - [SVG 与响应式 Web 设计](#svg-与响应式-web-设计)
 - [CSS3 过渡、变形和动画](#css3-过渡变形和动画)
 - [表单](#表单)
@@ -501,7 +523,266 @@ video {max-width: 100%; height: auto;}
 创建响应式网页及页面应用理想方式是 离线优先， 就是保证网站和应用始终可以打开，即使不上网也能加载内容。
 
 # CSS3 新特性
+CSS 规则
+```css
+.round { /* 选择符 */
+   border-radius: 10px; /* 声明 */
+}
+```
+
+## CSS 响应式多列布局
+- column-width 给每一列设定列宽，比如 `12em`。改变视口会动态改变列数
+- column-count 固定列数，宽度可变
+- column-gap 添加列间距，比如 `2em`
+- column-rule 添加分割线，比如 `thin dotted #999;`
+
+## 断字
+- `word-wrap: break-word` 使得容器包含字体，支持IE5.5
+- 截断文本，用`...`替换多余的文本
+    ```css
+    .truncate {
+        width: 520px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        /* 声明确保长出来的文本不会折行显示在外部元素中 */
+    }
+    ```
+
+## 创建水平滚动面板
+```css
+.Scroll_Wrapper {
+    width: 100%;
+    white-space: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    /* 在 Webkit 触摸设备上出现 */
+    -webkit-overflow-scrolling: touch;
+    /* 在支持的IE中删除滚动条 */
+    -ms-overflow-style: none;
+}
+.Item {
+    display: inline-flex;
+}
+/* 防止 WebKit 浏览器中出现滚动条 */
+.Scroll_Wrapper::-webkit-scrollbar {
+    display: none;
+}
+```
+`white-space`空白不折行。`inline-flex`把元素转换为行内元素。
+
+## CSS 中创建分支
+创建分支可以基于CSS，支持浏览器不多；借助 JavaScript库，获得广泛兼容性。
+```css
+.Item {
+    display: inline-block;
+}
+@supports (display: flex) {
+    .Item {
+        display: inline-flex;
+    }
+}
+```
+`@supports` 支持 and、 or 关键字,并非所有浏览器都支持`@supports`
+
+### Modernizr
+利用 Modernizr 这个 JavaScript 工具。是实现分支的可靠方式。
+
+> 渐进增强，就是从最简单的可用代码开始，从最基本的功能开始，从支持能力最低的设备开始，逐步增强到支持能力更强的设备
+
+在头部添加文件
+```html
+<script src="/js/libs/modernizr-2.8.3-custom.min.js"></script>
+```
+Modernizr 在检测完浏览器特性后，会给 html 标签添加检查到的类，比如
+```html
+<html class="js no-touch cssanimations csstransforms" lang="en"></html>
+```
+之后就可以根据这些类编写 css 分支
+
+## 新 CSS3 选择符
+- 属性选择符 `img[alt] {}`
+  - 可以结合字符串匹配
+    - `img[alt^="film"]` 以...开头
+    - `img[alt*="film"]` 包含...
+    - `img[alt$="film"]` 以...结尾
+  - 属性都被当成一个字符串
+- 结构化伪类: 基于元素之间位置关系选择它们
+  - :last-child 选择最后一项
+  - :only-child 唯一一个当前标签的选择符
+  - :only-of-type 选择任意链接
+  - nth规则
+    - nth-child(n)
+    - nth-last-child(n) 从另外一头开始
+    - nth-of-type(n) 区分类型
+    - nth-last-of-type(n)
+    - n可以是 odd 和 even，可以是数值，还可以是表达式
+  - :not 取反
+  - :empty 获取没有内容的标签，注意空格也属于内容一部分。
+  - :first-line 获取第一行
+
+## 自定义属性和变量
+自定义属性可以存储信息。
+```css
+:root {
+    --MainFont: 'Helvetica Neue', Helvetica, Arial;
+}
+```
+使用`:root` 把自定义属性保存在文档根元素上。之后引用自定义属性用`var()`
+```css
+.Title {
+    font-family: var(--MainFont);
+}
+```
+
+## CSS calc
+用于计算，可以计算加减乘除 `calc(50% - 10px)`
+
+## 相对视口长度
+- vw: 视口宽度
+- vh: 视口高度
+- vmin: 视口中的最小值，等于 vw 或 vh 中较小的值
+- vmax: 视口中的最大值，等于 vm 或 vh 中较大的值
+
+## Web 排版
+通过 `@font-face`实现 Web 字体,可以使用相对视口的单位设置字体。使用`@font-face` 唯一需要注意的问题是文件大小。
+
+## CSS3 的新颜色格式及透明度
+- RGB
+- HSL(色相、饱和度、亮度)
+- alpha 通道
+
 # CSS3 高级技术
+## 文字阴影特效
+```css
+.element {
+    text-shadow: 1px 1px 1px #ccc;
+}
+```
+缩写值规则先右后下，顺时针顺序。第一个值为右侧偏移量，第二个值为阴影下方偏移量，第三个值为模糊量，最后一个色值。可以省略第三个值(blur值)。
+多文字阴影:
+```css
+.text {
+    text-shadow: 3px 3px #bbb,/* 右下 */
+        -3px -3px #999; /* 左上 */
+}
+```
+## 盒阴影
+遵循和文字阴影相同的语法: 水平偏移量， 垂直偏移量， 模糊距离， 阴影尺寸，及阴影颜色。前两个长度值必须存在。可添加多重阴影，用逗号分隔，按照底部到顶部的顺序添加。
+
+阴影尺寸可以按照设置在所有方向上缩放阴影。
+### 内阴影
+```css
+.inset {
+    box-shadow: inset 0 0 40px #000;
+}
+```
+
+## 背景渐变
+### 线性渐变语法
+创建一个从红色渐变到蓝色的渐变背景
+```css
+.linear-gradient {
+    background: linear-gradient(red, blue);
+}
+```
+确定渐变的方向
+- `background: linear-gradient(to top right, red, blue` 默认从顶部到底部，这里设置为从底部左侧到顶部右侧
+- `background: linear-gradient(45deg, red, blue)`指定角度
+- `background: linear-gradient(red -50%, blue);`在容器内部不可见的地方开始渲染
+
+色标: 用逗号进行分隔。第一部分是颜色，第二部分是颜色的位置。
+```css
+background: linear-gradient(#f90 0, #f90 2%, #eee 50%, #f90 98%, #f90 100%);
+```
+
+兼容旧式浏览器
+```css
+.thing {
+    background: red;
+    background: linear-gradient(45deg, red, blue);
+}
+```
+### 径向渐变背景
+效果一般从一个中心发散成为圆形或者椭圆形。
+```css
+background: radial-gradient(12rem circle at bottom, yellow, orange, red);
+``` 
+默认为圆形，直径默认是容器最长边。设置为`circle`会沾满整个容器，设置`40px 30px` 会生成一个椭圆形，设置`ellipse` 会生成和容器大小一致的椭圆形。
+
+渐变位置: `at top right` 渐变中心在右上方，`at right 100px top 20px` 表示中心距右边框 100px 上边框20px处，`at center left` 中心在左边框中间处。
+
+为响应式新增关键词
+```css
+background: radial-gradient(closet-side circle at center, #333, blue);
+```
+- `closest-side` 渐变形状会与距离中心相近边框相切
+- `closest-corner` 渐变形状会与距离中心最近的角相切
+- `farthest-side` 和`closest-side`相反
+- `farthest-corner`
+- `cover` 等价于 `farthest-corner`
+- `contain` 等价于 `closest-side`
+
+可以给标签添加多个径向渐变制作图案
+### 重复渐变
+```css
+.repeating-radial-gradient {
+    background: repeating-radial-gradient(black 0px, orange 5px, red 10px);
+}
+```
+
+## 背景大小
+```css
+background-size: 100% 50%, 300px 400px,auto;
+```
+设置每张图片大小，第一个是宽度，第二个是高度，用逗号分隔。关键词
+- auto: 让图片保持其原生大小
+- cover: 保持图片比例，拓展至覆盖整个元素
+- contain: 保持图片比例，拓展图片让其最长边保持在元素内部
+
+## 背景位置
+背景位置默认为左上角。
+```css
+background-position: top 50px right 80px, 40px 40px, top center;
+```
+给三个背景图片设置位置。
+
+## 高分辨率背景图像
+媒体查询让我们可以在不同的视口大小下加载不同分辨率的图像。
+```css
+.bg {
+    background-image: url('bg.jpg');
+}
+@media(min-resolution: 1.5dppx) {
+    .bg {
+        background-image: url('bg@1_5x.jpg');
+    }
+}
+```
+媒体查询包括长度、高度或者其他支持的弧形。
+
+## CSS 滤镜
+```css
+.filter-drop-shadow {
+    filter: drop-shadow(8px 8px 6px #333);
+}
+```
+drop-shadow 语法与 box-shadow 类似
+
+可用的滤镜:
+- `filter: blur(3px)` 使用简单长度值，模糊效果
+- `filter: brightness(2)` 加亮
+- `filter: contrast(2)` 对比度
+- `filter: drop-shadow(4px 4px 6px #333)`
+- `filter: grayscale(.8)` 灰度化
+- `filter: hue-rotate(25deg)` 色轮变化
+- `filter: invert(75%)` 反色程度
+- `filter: opacity(50%)` 透明度
+- `filter: saturate(15%)` 饱和度
+- `filter: sepia(.74)` 添加褐色滤镜
+
+多个滤镜用空格分隔。慎重使用滤镜效果，有时滤镜渲染会有很大开销。
+
 # SVG 与响应式 Web 设计
 # CSS3 过渡、变形和动画
 # 表单
