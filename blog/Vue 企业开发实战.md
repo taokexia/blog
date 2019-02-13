@@ -141,7 +141,7 @@ module.exports = {
 ```
 webpack ./src/index.js build.js
 ```
-# ES6的使用
+# ES6的使用 
 # 路由配置
 # 初识 Vue.js
 # 服务端通信
