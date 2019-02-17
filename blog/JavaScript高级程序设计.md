@@ -328,8 +328,85 @@ ES 中数组是有序列表，每一项可以保存任何类型数据。而且�
   - 替换 `splice(2, 1, "red")`
   - splice 始终返回一个数组。
 - 位置方法: ES5 新增 `indexOf()` 和 `lastIndexOf()` 接收两个参数，要查找的项和查找起点位置。一个从头往后找，一个从后往前找。返回要查找项在数组中位置，没有返回 -1.
-- 迭代方法
+- 迭代方法: ES5 定义了 5 个迭代方法，每个方法接受两个参数: 要在每一项上运行函数和(可选的)该函数的作用域对象——影响 this 的值。
+  - `every()` 对数组中每一项运行都给定函数，如每一项都返回 true, 则为 true
+  - `filter()` 返回该函数返回 true 的项组成的数组
+  - `forEach()` 每一项运行函数，没有返回值
+  - `map` 对数组中每一项运行给定函数，返回每次函数调用结果组成的数组
+  - `some()` 对数组中每一项运行给定函数，任一项为 true，则返回 true
+- 归并方法: 两个方法都会迭代数组所有项，然后构建一个最终返回值。两个方法都接受两个参数，一个是每一项上调用的函数和(可选)作为归并基础的初始值
+  - `reduce()` 从头往后遍历执行, 传入的函数可以接受4个参数: 前一个值，当前值，项的索引，数组对象。前一个值为上一次执行函数的返回值。
+  - `reduceRight()` 从后往前执行
+## Date 类型
+以 Java 的 java.util.Date 类基础上构建。使用自 UTC 1970年1月1日午夜开始经过毫秒来保存日期
+```js
+var now = new Date();
+```
+- `Date.parse()` 接收一个表示日期字符串参数，然后根据这个字符串返回相应日期的毫秒数。如果不能转换则返回 NaN
+- `Date.UTC()` 方法同样也返回表示日期的毫秒数。参数分别是年份、基于0的月份、月中那一天，小时数(0到23)、分钟、秒及毫秒数。前两个参数必须。
+- `Date.now()` 返回表示调用这个方法时的日期和时间的毫秒数。
 
+Date 类型的 toLocaleString() 方法按照与浏览器设置市区相适应的格式返回日期的时间。 toString() 通常返回带有失去信息的日期和时间。 valueOf() 方法，则根本不返回字符串，而返回日期的毫秒表示。
+### 日期格式化
+- toDateString() 以特定于实现的格式显示星期几、月、日和年，toLocaleDateString() 显示特定地区
+- toTimeString() 以特定于现实的格式时、分、秒和时区， toLocaleTimeString() 显示特定时区
+- toUTCString() 以特定实现格式完整的 UTC 时期
+
+### 日期/时间组件方法
+- getTime() 与valueOf() 返回相同结果,都返回时间戳
+- setTime() 
+- getFullYear()
+- getMonth()
+- getDate() 返回日期月份中的天数
+- getDay() 返回星期几
+- getHours() 
+- getMinutes()
+- getSeconds()
+- gitMilliseconds()
+
+## RegExp 类型
+RegExp 类型支持正则表达式.
+1. 字面量定义
+```js
+var expression = /pattern/ flags;
+```
+2. 使用构造函数创建: 参数1 是匹配的字符串模式，参数2 是可选的标志字符串
+```js
+var pattern = new RegExp("[bc]at", "i")
+```
+ES3 中 正则表达式字面量始终会共享同一个 RegExp实例，而构造函数每次都构造一个新的实例。调用 valueOf 返回正则表达式本身
+
+flags(匹配模式)有3个标志: `g` 表示全局模式，应用所有字符串, `i` 不区分大小写, `m` 多行模式。正则表达式的**元字符**必须转义。
+- [] 匹配其中一个字符, 比如 [ab], 匹配 a 或 b
+- . 匹配任意字符
+
+### RegExp 实例属性
+- global 布尔值，是否标记 g标志
+- ignoreCase 是否标记 i标志
+- lastIndex 整数，表示开始搜索下一匹配项的字符位置，从0开始
+- multiline 是否标记 m标志
+- source 正则表达式的字符串表示
+### RegExp 实例方法
+- exec() 接收应用模式字符串，没有匹配返回 null，返回第一个匹配信息的数组。包含 index(匹配字符串的位置) 和 input(应用正则表达式字符串) 属性。还包含数组，第一项是整个匹配模式匹配的字符串，其他项是与模式中的捕获匹配的字符串。
+- test() 接受一个字符串参数，匹配返回 true。
+
+### RegExp 构造函数属性
+- input $_ 最近一次匹配字符串
+- lastMatch $& 最近一次匹配项
+- leftContext $+ 最近一次匹配的捕获组
+- multline $* 布尔值，是否所有表达式都是用多行
+- rightContext $' input字符串中 lastMatch 之后的文本
+
+## Function 类型
+两种定义函数方式没有差别
+```js
+function a(b) {
+    return b;
+}
+var a = function(b) {
+    return b;
+}
+```
 # 面向对象的程序设计
 # 函数表达式
 # BOM

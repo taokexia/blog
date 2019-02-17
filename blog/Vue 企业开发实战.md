@@ -142,8 +142,266 @@ module.exports = {
 webpack ./src/index.js build.js
 ```
 # ES6的使用 
+## let 和 const 命令
+ES6 新增命令，用了声明变量。
+
+let命令
+1. let 只在所在代码块有效。
+2. let 声明变量作用域不会被提前。var 支持变量提升， let 不行，提前使用会报错。
+3. 在相同作用域下不能声明相同的变量
+4. for 循环体中 let 的父子作用域，for 循环内部函数执行是异步操作。
+
+const命令: 声明一个只读常理。一旦声明，不能修改。作用域与 let 相同。
+保证的是内存地址不得改动。对于引用类型，常量指向的内存地址保存的指针。
+
+> 一般在需要一个模块或定义一些全局变量时使用。
+
+## 变量解构赋值
+Destructuring: ES6 允许按照一定模式从数组和对象中提取值，再对变量赋值。
+```js
+let [a, b, c] = [1, 2, 3]
+let [a, [b], d] = [1, [2, 3], 4] // a=1 b=2 d=4
+let [x=1] = [undefined] // x=1
+let [x=1] = [null] // x= null
+```
+> ES6 内部使用严格相等运输符(===)来判断一个位置是否有值，只有当一个数组成为成员等于 undefined， 默认值才会生效
+
+解构不成功，变量的值为 undefined。 不完全解构: 只给一部分变量赋值。
+
+解构不仅可以用于数组，还可以用于对象。数组元素要按照次序排序，变量取值由它位置决定，对象属性没有次序，变量必须与属性同名，才可取到值
+```js
+let {bar, foo} = {foo: "aaa", bar: "bbb"}; // bar=bbb, foo=aaa
+let {foo: baz} = {foo: "aaa", bar: "bbb"}; 
+// baz=aaa foo 是匹配模式， baz 是变量
+let {x: y=3} = {x: 5} // y=5
+```
+> 对象解构赋值的内部机制，是先找到同名属性，在赋值给对应的变量，真正被赋值的是后者，而不是前者。
+
+利用解构赋值可以方便提取 JSON 数据
+
+## 使用箭头函数
+简化代码量，与普通函数相比，优势主要是:
+1. 不绑定 this，arguments
+
+    this 始终为定义时的this，如果要使用 arguments 会出现一些问题。如果要获取参数可以使用剩余参数来取代 arguments
+    ```js
+    let arrowfunc = (...theArgs) => console.log(theArgs.length)
+    ```
+2. 更简化的代码语法
+```js
+(参数) => { 函数声明 }
+单一参数 => { 函数声明 }
+```
+不适用箭头函数的情况：
+1. 对象方法: 对象方法不建议使用箭头函数。
+    ```js
+    const Person = {
+        username: 'Tom',
+        sayHello: () => {
+            setInterval(() => {
+                console.log('my name is' + this.usernaem)
+            }, 1000)
+        }
+    }
+    Person.sayHello() // my name is undefined
+    ```
+    因为方法写在对象里，而对象括号不能封闭作用域，所有此时 this 指向全局对象。
+2. 不能作为构造函数，箭头函数的 this 具有不绑定特点
+3. 定义原型方法。
+
+> 需要动态修改 this 的方法不建议使用 this
+
+## Map 数据结构
+JS 对象本质上是键值对的集合(Hash 结构)，但传统上只能使用字符串为键。ES6 提供了 Map 这种数据结构，键范围不限于字符串。
+1. 创建: `const map = new Map([['name','张三'],['title','author']])`
+2. 常用属性和方法
+   1. size 属性: 返回 Map 成员总数
+   2. set 和 get 方法: 给 Map 键设置对应值和获取键对应的值，可采用链式写法。get获取不到key，则返回 undefined
+   3. has 方法，返回一个布尔值，判断某个键是否在当前 Map 对象中
+   4. delete 方法 删除某个键，成功返回 true，失败返回 false
+   5. 遍历方法
+      1. keys() 返回键名的遍历器
+      2. values() 返回键值的遍历器
+      3. entries() 返回所有成员的遍历器
+      4. forEach() 遍历 Map 所有成员
+
+## Module 的语法
+> ES6 模块设计思想是尽量静态化，使得编译时就能确定模块的依赖关系，以及输出和输入的变量。
+
+### export 命令
+一个模块是一个独立的文件，文件内部所有变量外部无法获取。如果希望外部能够读取模块内部变量，必须使用 export 关键字输出变量。
+
+### import 命令
+使用 export 命令定义模块的对外接口以后，其他 JS 文件就可以通过 import 命令加载这个模块。import 命令接受一对大括号，里面指定要从其他模块导入的变量名(或函数名),大括号里面变量必须与被导入模块对外接口名称相同
+```js
+import {firstname, lastname} from './profile.js'
+```
+> import 导入的引用变量不建议对属性进行修改
+
+import 可以使用绝对路径和相对路径，`.js`后缀可省略
+### export default 命令
+import 命令用户需要知道所加载变量名或函数名。 而使用 export default 指定为模块默认输出，这样 import 命令可以为导入的变量指定另一个名字。一个模块只能使用一次。
+
+## Promise 对象
+Promise 是异步编程的一种解决方案。
+
+特点:
+1. 对象状态不受外界干扰。有3中状态: pending(进行中)、fulfilled(已成功)和 rejected(已失败)。只有异步操作结果可以决定哪种状态
+2. 一旦状态改变，就不会再变，任何时候都可以得到这个结果。状态改变只有两种: `pending->fulfilled` 和 `pending->rejected`，一旦到 resolved(定型)，就不会再改变
+
+缺点:
+1. 无法取消 Promise，一旦新建就立即执行，无法中途取消
+2. 如果不设置回调函数，内部抛出错误就不会反应到外部
+3. 当处于 pending 状态时，无法得知目前进展到什么阶段(刚刚开始还是即将完成)
+
+## 基本用法
+1. 接受两个参数，resolve 和 reject。resolve 函数在状态`pending->fulfilled` ，操作成功时调用，将异步操作结果作为参数返回出去。 reject 函数在状态`pending->rejected`,操作失败时调用，将操作的错误作为参数传递出去。
+2. 使用 then 指定 resolve和 reject的回调函数。第二个回调函数可选，不一定会执行。
+```js
+const promise = new Promise(function(resolve, reject) {
+    // some code
+    if(/* 异步操作成功 */) {
+        resolve(value);
+    } else {
+        reject(err);
+    }
+});
+promise.then(function(value) {
+    // success
+}, function(error) {
+    // failure
+});
+```
 # 路由配置
+## 前端路由
+路由就是根据不同的 url 地址展示不同的内容或页面。前端路由和后端路由技术实现不一样，原理一样。在 HTML5 的 history 出现之前，前端路由都是通过 hash 来实现，它的 URL 规则中需要带上 "#"。
+
+web 服务器不会解析 hash，会自动忽略#后面的内容。但 JS 可以通过 `window.location.hash`读取到路径之后进行解析。
+
+> history 是 HTML5 新增 API，可以操作浏览器的 session history
+
+前端路由优点:
+- 访问一个新页面仅变化路径，没有网络延迟，提升体验
+- 支持单页面应用
+
+缺点:
+- 浏览器前接、后退按钮会重新发送请求，没有合理利用缓存
+## Vue Router 基本使用
+Vue Router 是 Vue 的一个插件，需要在 Vue 的全局应用中通过 `Vue.use()` 将它纳入到 Vue 实例中。Vue-cli 搭建脚手架时会询问是否需要路由，路由生成位置 `src/router`,内部`index.js`文件
+```js
+import Vue from 'vue'
+import Router from 'vue-router'
+// 引入相应组件或页面
+import HelloWorld from '@/components/HelloWorld'
+import Login from '@/pages/login'
+Vue.use(Router)
+export default new Router({
+    routes: [
+        {
+            path: '/', // 路径，默认跳转
+            name: 'Hello World' // 命名
+            component: HelloWorld // 组件
+        },
+        {
+            path: '/login',
+            name: 'Login',
+            component: Login 
+        }
+    ]
+})
+```
+`main.js` 导入 router 路由配置信息
+```js
+import Vue from 'vue'
+import router from './router'
+import App from './App'
+
+new Vue({
+    el: '#app',
+    router,
+    template: '<App/>'
+    components: { App }
+})
+```
+路由匹配到组件将渲染到 App.vue 的 `<router-view></router-view>`
+## 路由重定向
+```js
+const router = new VueRouter({
+    routes: [
+        { path: '/a', redirect: '/b' },
+        // 可以是一个命名路由
+        { path: '/b', redirect: {name: 'foo'}}
+        // 可以是一个方法
+        { path: '/c', redirect: to => {
+            // 方法接收“目标路由作为参数”
+            // return 重定向的 “字符串路径/路径对象”
+        }}
+    ]
+})
+```
+## 路由懒加载
+结合 Vue 异步组件和 Webpack 代码分隔，轻松实现路由组件的懒加载。
+
+> 异步组件: 在大型应用中，可能需要将应用拆分多个小模块，按需下载， Vue 允许将组件定义为1个工厂函数，异步地解析组件的定义。
+
+首先，可以将异步组件定义成一个 Promise 的工厂函数
+```js
+const Foo = () => Promise.resolve({/* 组件定义对象 */})
+```
+Webpack 动态 import 来定义代码分块点
+```js
+const Foo = () => import('./Foo.vue')
+```
+懒加载不会一次性加载所有组件，而是访问到组件的时候才加载。
+```js
+const Header = () => import('@/components/header');
+```
+## `router-link`
+支持用户在具有路由功能的应用中单击导航。通过 to 属性指定目标地址，tag 属性指定生成标签。
+```html
+<router-link v-bind:to="home"></router-link>
+<router-link v-bind:to="{name: 'user', params: { userId: 123 }}">User</router-link>
+<!-- 带查询参数 -->
+<router-link :to={name: 'user', params: { userId: 123 }}">User</router-link>
+```
+优势:
+1. Html history 模式与 hash模式下表现一致。
+2. 会守卫单击事件，让浏览器不再重新加载页面
+3. history 模式下使用 base 选项之后，所有 to 属性不需要写基路径。
+
+## 路由对象属性:
+- `$route.pah` 对应当前路由路径
+- `$route.params` key/value 对象，包含动态片段和全局匹配片段
+- `$route.query` 表示查询参数
+- `$route.hash` 路由 hash 值
+- `$route.fullPath` 完成解析后 URL
+- `$route.matched` 包含当前路由所有嵌套路径片段的路由记录
+
+## 页面间导航
+- `router.push(location)` 向 history 栈添加一个新记录，当用户点击浏览器后退按钮时，回到之前的 URL。
+
+    > 单击`<router-link>` 内部调用 router.push() 方法，单击 `<router-link>`等于调用 push
+- `router.replace(location)` 不同的是它不会向 history 栈添加新记录，等价于 `<router-link :to='...' replace>`
+- `router.go(n)` 整数参数，代表前进或后退多少步，类似于 `window.history.go(n)`
+
 # 初识 Vue.js
+Vue.js 介绍: 简单小巧的核心，渐进式的技术栈，足以应付任何规模的应用。提供了 Web 开发中的常见高级功能
+1. 解耦视图与数据
+2. 可复用的组件
+3. 前端路由
+4. 状态管理
+5. 虚拟 DOM(Virtual DOM)
+
+使用了 MVVM 模式:
+M: 负责数据存储
+V: 负责页面展示
+VM: 负责业务逻辑处理，对数据加工后交给视图展示
+
+优点是:
+1. 低耦合
+2. 可重用性
+3. 独立开发
+
 # 服务端通信
 # Vue.js 指令
 # 组件详解
