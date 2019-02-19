@@ -402,8 +402,107 @@ VM: 负责业务逻辑处理，对数据加工后交给视图展示
 2. 可重用性
 3. 独立开发
 
+## Vue 实例与数据绑定
+插值表达式: `{{ ... }}`, 作用是将双大括号中的数据替换成对应属性值进行展示。也叫模板语法(Mustache 语法)
+
+插值可以为 JSON 数据、数字、字符串和插值表达式。
+
+## 生命周期
+指实例从构造函数开始执行(被创建)，到被 GC (垃圾回收)销毁的整个存在时期。
+
+生命周期钩子: 在实例对象从创建到被回收的整个过程中，不同时期会有不同钩子函数，可以利用不同时期钩子函数完成不同操作。
+
+生命周期有
+- `Created` 创建后，组件实例刚创建完成，此时 DOM 还未生成
+- `mounted` 载入后，模板编译，挂载之后
+- `updated` 组件更新之后
+- `destoryed` 组件销毁后调用
+
+## 指令
+`v-bind`,简写为 `:` 动态更新 HTML 元素上属性,可用于动态切换 class，当有多个 calss 时，可以绑定成数组形式，绑定 class 过长时可以使用**计算属性**
+  - 绑定内联样式 `:style="{border: activeColor, fontSize: fontSize + 'px'}"`
+  - 使用 `:style` 时，Vue 会自动给特殊的 CSS 属性名称增加前缀，比如 `transform` 属性
+
 # 服务端通信
+Vue.js 本身没有提供与服务器通信接口，通过插件形式实现 Ajax 技术的服务端通信。
+
+## connect-mock-middleware 工具使用
+connect-mock-middleware 是一个非常方便、实用的 mock 模拟工具。支持 mockJs 语法，支持 json、jsonp，修改 mock 数据时不需要重新加载
+
+在 config 的 index 文件中添加代理
+```js
+proxyTable: {
+    '/api': {
+        target: 'http://127.0.0.1: 3721',
+        changeOrigin: true,
+        secure: false
+    }
+}
+```
+
+## Mock.js 语法
+Mock.js 时一个模拟数据生成器，可以使用前端独立于后端开发。语法规范包括两部分:
+- 数据模板定义规范(DTD)
+  - 每个属性由 3 部分构成： 属性名、生成规则、属性值 `'name|rule': value`
+- 数据占位符定义规范(DPD): 只在属性中占个位置，并不出现在最终的属性值中
+
+## snail mock 工具使用
+snail mock 工具能够模拟服务器功能，生成接口 url服务地址供调用,其中依赖了 connect-mock-middleware 
+```
+cnpm install -g snail-cline
+```
+开启 mock 服务 `snail mock`
+
+## Axios 安装及配置
+Axios 基于 promise、用于浏览器和 node.js 的 HTTP 客户端，常用于处理 Ajax 请求。
+```
+cnpm install axios --save
+```
+- `axios.get('/user?ID=1234')` 发起 get 请求
+- `axios.post('/user', params)` 发起 post 请求
+
+请求设置
+- url 请求服务器链接
+- method 请求方法
+- baseURL 请求的基本地址
+- transformRequest 请求前转化数据,只适用于 put、get、patch
+- transformResponse 提前处理返回的数据
+- headers 自定义请求头
+- params 请求连接中的请求暗示，必须是一个纯对象或者 URLSearchParams 对象
+- paramsSerializer 可选函数，用来序列化参数
+- data 请求主体需要设置的数据
+- timeout 请求超时时间，单位毫秒
+
+拦截器: 可以在请求或返回结果被 then 或者 catch 处理之前对它们进行拦截。
+```js
+axios.interceptors.request.use(function(config) {
+    return config;
+}, function(error) {
+    // 当请求出错时返回
+    return Promise.reject(error);
+})
+```
 # Vue.js 指令
+- v-if 条件渲染指令是根据表达式的真假来插入和删除元素的。 `v-fi='表达式'` 根据表达式结果的真假来确定是否显示当前元素，如果表达式为 true，则显示元素，为 false 则不显示。
+- v-else 必须紧跟 v-if 元素后面,否则不能识别
+- v-show 用法与 v-if 指令基本一致，区别时 v-show 指令通过改变元素的 css 属性 display 来控制显示与隐藏。无论条件是否为真，都会被编译，其内部通过 CSS 属性的 display 来控制显示或者隐藏
+- v-for 基于一个数组来渲染一个列表
+  - key 属性: 便于 Vue 实例跟踪每个节点的身份，从而重用和重新排序实现元素，key值要唯一。
+
+## 方法与事件
+- v-on 为 HTML 元素绑定监听事件,类似原生 Js 的 onclick, `v-on:事件名词='函数名词()'`
+
+  修饰符:
+  - .stop: 调用 `event.stopPropagation()`
+  - .prevent: 调用 `event.preventDefault()`
+  - .self: 当事件从侦听器绑定的元素本身触发时才触发回调
+  - .{keycode}: 只在指定键上触发回调。如 Esc: 27、 Tab: 9、Enter: 13
+- v-model与表单：用在表单类元素上双向绑定数据
+  - `v-model=变量` Vue 实例中 data 与其渲染的 DOM 元素上的内容保持一致，两者无论谁改变，另一方也相应地更新相同的数据。
+
+  修饰符：
+  - lazy 转变为在 change 事件中同步
+  - trim 自动过滤首位空格、密码输入框不要使用
 # 组件详解
 # 计算属性和侦听器
 # 插件的使用
