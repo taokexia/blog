@@ -191,6 +191,29 @@ console.log(format) // 1,234,567,890
 
 训练6: 编写正则表达式测试传入的ip地址是否正确,例如传入 `1.1.1.1` 返回 true, 传入 `1.1.1.257` 返回 false
 
+## 虚拟 DOM 标签解析
+在Vue源码中构建虚拟DOM, 首先把 template 编译成AST语法树, 再转换为 render 函数 最终返回一个VNode(VNode就是Vue的虚拟DOM节点)
+
+而要编译 template, 首先就是要对 template 进行解析。解析的过程中使用到了正则表达式, 比如解析下面代码
+```js
+var dom = `<div :class="c" class="demo" v-if="isShow">{{item}}</div>`
+
+// 匹配变量名
+const variable = /[a-zA-Z_][\w\-\.]*/
+// 匹配标签名
+const tagName = /^<([a-zA-Z_][\w\-\.])*/
+console.log(tagName.exec(dom)[1])// 返回 div
+// 匹配属性
+const attr = /\s*([^\s'"<>/=]+)(?:=)\s*(?:"([^"]*)"+|'([^']*)'+|([^\s"'=<>`]+))/g
+// \s*([^\s'"<>/=]+) 匹配属性名
+// (?:=) 匹配赋值号 = 
+// (?:"([^"]*)"+|'([^']*)'+|([^\s"'=<>`]+)) 匹配属性值，包括 ""、 '' 和其它形式
+console.log(attr[1]) // 返回 :class
+console.log(attr[2]) // 返回 "c"
+// 匹配 {{}} 里的内容
+const val = /{{(.*)}}/ // 返回 item
+``` 
+
 # 答案
 训练1: 
 ```js
